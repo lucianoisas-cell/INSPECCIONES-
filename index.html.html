@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspección de Automotores</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        
+        /* Estilos optimizados para botones táctiles en celulares */
+        .radio-group input[type="radio"] {
+            display: none;
+        }
+        
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .radio-group label:first-of-type {
+            border-top-left-radius: 0.375rem;
+            border-bottom-left-radius: 0.375rem;
+        }
+        
+        .radio-group label:last-of-type {
+            border-top-right-radius: 0.375rem;
+            border-bottom-right-radius: 0.375rem;
+            border-left: none;
+        }
+        
+        .radio-group-3 label:nth-of-type(2) {
+             border-left: none;
+        }
+
+        /* Colores activos para SI / NO (Excluyentes) */
+        .radio-sino input[value="SI"]:checked + label {
+            background-color: #10b981; /* emerald-500 */
+            color: white;
+            border-color: #10b981;
+        }
+        .radio-sino input[value="NO"]:checked + label {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            border-color: #ef4444;
+        }
+
+        /* Colores activos para BUENO / REGULAR / MALO (Estado del Vehículo) */
+        .radio-estado input[value="BUENO"]:checked + label {
+            background-color: #10b981; /* emerald-500 */
+            color: white;
+            border-color: #10b981;
+        }
+        .radio-estado input[value="REGULAR"]:checked + label {
+            background-color: #f59e0b; /* amber-500 */
+            color: white;
+            border-color: #f59e0b;
+        }
+        .radio-estado input[value="MALO"]:checked + label {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            border-color: #ef4444;
+        }
+
+        /* Notificación flotante de confirmación */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 100;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s;
+        }
+
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
+        }
+
+        .tab-btn.active {
+            border-bottom: 3px solid #2563eb;
+            color: #2563eb;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="text-gray-800 pb-20">
+
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-40">
+        <div class="max-w-3xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold truncate"><i class="fa-solid fa-clipboard-check mr-2"></i> Inspección de Flota</h1>
+            <div class="flex items-center gap-2">
+                <span id="db-status-badge" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-blue-500 text-blue-100">
+                    <span class="h-2 w-2 rounded-full bg-blue-300 animate-pulse" id="db-status-dot"></span>
+                    <span id="db-status-text">Conectando...</span>
+                </span>
+                <div class="text-xs opacity-90 hidden sm:block" id="currentDateDisplay"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Pestañas para cambiar entre Formulario e Historial -->
+    <nav class="bg-white border-b border-gray-200 sticky top-[61px] z-30 shadow-sm">
+        <div class="max-w-3xl mx-auto flex justify-around">
+            <button id="btn-tab-form" onclick="switchTab('form')" class="tab-btn active py-3.5 text-center flex-1 font-medium text-sm text-gray-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2">
+                <i class="fa-solid fa-square-plus text-base"></i> Nueva Inspección
+            </button>
+            <button id="btn-tab-history" onclick="switchTab('history')" class="tab-btn py-3.5 text-center flex-1 font-medium text-sm text-gray-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2 relative">
+                <i class="fa-solid fa-folder-open text-base"></i> Historial / Novedades
+                <span id="history-badge" class="hidden absolute top-2 right-4 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">New</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-3xl mx-auto p-4 mt-2">
+        
+        <!-- PESTAÑA 1: Formulario de Nueva Inspección -->
+        <div id="tab-content-form">
+            <form id="inspectionForm" class="space-y-6">
+                
+                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('datos-generales')">
+                        <h2 class="text-lg font-semibold text-gray-700">1. Datos Generales</h2>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-200" id="icon-datos-generales"></i>
+                    </div>
+                    
+                    <div id="datos-generales" class="p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Inspección</label>
+                                <input type="date" id="fecha" name="fecha" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Empresa Prestadora</label>
+                                <input type="text" name="empresa" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre de la empresa">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Interno</label>
+                                <input type="text" name="interno" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: 104">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Patente / Dominio</label>
+                                <input type="text" name="patente" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500 uppercase" placeholder="Ej: AB123CD o ABC123">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Marca del Vehículo</label>
+                                <input type="text" name="marca" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Fiat">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Modelo / Año</label>
+                                <input type="text" name="modelo_ano" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Cronos / 2023">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Chofer</label>
+                                <input type="text" name="chofer" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre completo del chofer">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('excluyentes')">
+                        <h2 class="text-lg font-semibold text-gray-700">2. Requisitos Excluyentes</h2>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-200" id="icon-excluyentes"></i>
+                    </div>
+                    
+                    <div id="excluyentes" class="p-0">
+                        <div class="bg-red-50 border-l-4 border-red-500 p-4 m-3 rounded-r-md">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-red-700 font-bold">
+                                        ATENCIÓN: Cualquier faltante de documentación (Requisitos Excluyentes) es motivo directo de SUSPENSIÓN de la unidad.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">Ítem / Documento</th>
+                                        <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Presenta</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Vencimiento</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="excluyentesBody">
+                                    <!-- Se genera automáticamente con JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('estado-vehiculo')">
+                        <h2 class="text-lg font-semibold text-gray-700">3. Estado del Vehículo</h2>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-200" id="icon-estado-vehiculo"></i>
+                    </div>
+                    
+                    <div id="estado-vehiculo" class="p-0">
+                        <ul class="divide-y divide-gray-200" id="estadoVehiculoList">
+                            <!-- Se genera automáticamente con JS -->
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('cierre')">
+                        <h2 class="text-lg font-semibold text-gray-700">4. Cierre de Inspección</h2>
+                        <i class="fa-solid fa-chevron-up text-gray-500 transition-transform duration-200 transform rotate-180" id="icon-cierre"></i>
+                    </div>
+                    
+                    <div id="cierre" class="p-4 space-y-4">
+                        <div class="border-b pb-4 mb-4">
+                             <label class="block text-sm font-medium text-gray-700 mb-2">Indumentaria y prolijidad del conductor</label>
+                             <div class="flex radio-group radio-group-3 radio-estado w-full">
+                                <input type="radio" id="indumentaria_bueno" name="indumentaria" value="BUENO">
+                                <label for="indumentaria_bueno" class="flex-1 text-center py-2">BUENO</label>
+                                
+                                <input type="radio" id="indumentaria_regular" name="indumentaria" value="REGULAR">
+                                <label for="indumentaria_regular" class="flex-1 text-center py-2 border-l-0">REGULAR</label>
+                                
+                                <input type="radio" id="indumentaria_malo" name="indumentaria" value="MALO">
+                                <label for="indumentaria_malo" class="flex-1 text-center py-2">MALO</label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Inspeccionado por (Inspector):</label>
+                            <input type="text" name="inspector" id="inspector_input" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre completo del inspector">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones Generales</label>
+                            <textarea name="observaciones" rows="3" class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Anotaciones de estado o desperfectos encontrados..."></textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Botones fijos inferiores para facilitar el uso en celular -->
+                <div class="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
+                    <div class="max-w-3xl mx-auto flex gap-2 md:gap-4">
+                        <button type="button" onclick="clearForm()" class="bg-gray-200 text-gray-800 py-3 px-3 md:px-4 rounded-lg font-medium hover:bg-gray-300 transition-colors focus:outline-none flex-shrink-0" title="Limpiar planilla">
+                            <i class="fa-solid fa-eraser"></i> <span class="hidden md:inline ml-1">Limpiar</span>
+                        </button>
+                        <button type="button" onclick="submitInspection('SUSPENDIDO')" class="flex-1 bg-red-600 text-white py-3 px-2 md:px-4 rounded-lg font-medium hover:bg-red-700 transition-colors shadow-md flex items-center justify-center">
+                            <i class="fa-solid fa-ban mr-1.5 md:mr-2"></i> <span class="text-sm md:text-base">Suspender Vehículo</span>
+                        </button>
+                        <button type="button" onclick="submitInspection('APROBADO')" class="flex-1 bg-emerald-600 text-white py-3 px-2 md:px-4 rounded-lg font-medium hover:bg-emerald-700 transition-colors shadow-md flex items-center justify-center">
+                            <i class="fa-solid fa-check mr-1.5 md:mr-2"></i> <span class="text-sm md:text-base">Aprobar Vehículo</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="h-16"></div>
+            </form>
+        </div>
+
+        <!-- PESTAÑA 2: Panel de Base de Datos / Historial de Novedades -->
+        <div id="tab-content-history" class="hidden space-y-6">
+            
+            <div class="grid grid-cols-3 gap-3">
+                <div class="bg-white p-3 rounded-lg border border-gray-200 text-center shadow-sm">
+                    <span class="block text-xs text-gray-500 font-medium uppercase">Inspeccionados</span>
+                    <span id="stats-total" class="text-2xl font-bold text-gray-800">0</span>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center shadow-sm">
+                    <span class="block text-xs text-emerald-600 font-medium uppercase">Aprobados</span>
+                    <span id="stats-aprobados" class="text-2xl font-bold text-emerald-700">0</span>
+                </div>
+                <div class="bg-red-50 p-3 rounded-lg border border-red-100 text-center shadow-sm">
+                    <span class="block text-xs text-red-600 font-medium uppercase">Suspendidos</span>
+                    <span id="stats-suspendidos" class="text-2xl font-bold text-red-700">0</span>
+                </div>
+            </div>
+
+            <!-- Filtros de Búsqueda y Botón Exportar Excel -->
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-filter text-blue-500"></i> Buscar e Inspeccionar
+                    </h3>
+                    <!-- Botón de descarga de planilla Excel -->
+                    <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs rounded-lg font-bold transition-all shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-excel text-sm animate-pulse"></i> Exportar a Excel
+                    </button>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-search absolute left-3 top-3.5 text-gray-400 text-xs"></i>
+                        <input type="text" id="filter-search" oninput="applyFilters()" class="w-full rounded-md border border-gray-300 py-2.5 pl-8 pr-3 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Buscar por Patente, Chofer, Inspector...">
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="filter-veredicto" onchange="applyFilters()" class="rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white flex-1 sm:flex-initial">
+                            <option value="TODOS">Todos</option>
+                            <option value="APROBADO">Aprobados</option>
+                            <option value="SUSPENDIDO">Suspendidos</option>
+                        </select>
+                        <select id="filter-tiempo" onchange="applyFilters()" class="rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white flex-1 sm:flex-initial">
+                            <option value="TODOS">Todas las fechas</option>
+                            <option value="HOY">Solo Hoy</option>
+                            <option value="7DIAS">Últimos 7 días</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Novedades cargadas desde la Base de Datos -->
+            <div class="space-y-3" id="inspectionsListContainer">
+                <div class="text-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200">
+                    <i class="fa-solid fa-spinner animate-spin text-2xl text-blue-500 mb-2"></i>
+                    <p class="text-sm font-medium">Buscando novedades en la base de datos...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de Copiado de Reporte (Reemplazo del envío directo) -->
+    <div id="shareModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-[60] px-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-300" id="shareModalContent">
+            <div class="p-6 text-center transition-colors duration-300" id="modalHeaderBg">
+                <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-white mb-4 shadow-sm" id="modalIconContainer">
+                    <i class="fa-solid fa-clipboard-check text-2xl" id="modalIcon"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-1" id="modalTitle">Inspección Guardada</h3>
+                <p class="text-white text-sm opacity-90" id="modalSubtitle">Registro subido correctamente</p>
+            </div>
+            <div class="p-6 space-y-4 bg-gray-50">
+                <p class="text-sm text-gray-600 text-center font-medium">Copia y comparte el reporte:</p>
+                
+                <!-- Cuadro de texto para copiar el reporte -->
+                <textarea id="reportTextarea" readonly class="w-full h-48 p-3 text-xs text-gray-700 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 resize-none font-mono"></textarea>
+                
+                <!-- Botón de Copiar Inteligente -->
+                <button type="button" id="btnCopy" onclick="copyReportToClipboard()" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none shadow-sm transition-colors">
+                    <i class="fa-regular fa-copy mr-2 text-xl" id="copyIcon"></i> <span id="copyText">Copiar Reporte</span>
+                </button>
+                
+                <div class="pt-2">
+                    <button type="button" onclick="closeShareModal()" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-100 focus:outline-none transition-colors">
+                        Cerrar y Volver
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalles del Historial -->
+    <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-[60] px-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300" id="detailModalContent">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-800">Detalle de Inspección</h3>
+                <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 max-h-[70vh] overflow-y-auto space-y-4" id="detailModalBody">
+                <!-- Inyección dinámica -->
+            </div>
+            <div class="p-4 bg-gray-50 border-t border-gray-100 flex gap-2">
+                <button type="button" id="btnCopyDetail" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-copy"></i> Copiar Reporte
+                </button>
+                <button onclick="closeDetailModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación para Eliminar Registro (Evita el uso de alert/confirm) -->
+    <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-[70] px-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs overflow-hidden p-6 text-center transform scale-95 transition-transform duration-300" id="deleteModalContent">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 text-red-600 mb-4">
+                <i class="fa-solid fa-trash-can text-lg"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">¿Eliminar Inspección?</h3>
+            <p class="text-sm text-gray-500 mb-6">Esta acción borrará el registro de la base de datos de manera permanente. No se puede deshacer.</p>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-lg text-sm transition-colors">Cancelar</button>
+                <button id="btnConfirmDelete" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors">Sí, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Elemento flotante para notificaciones rápidas -->
+    <div id="toast">Operación realizada con éxito.</div>
+
+    <!-- Configuración e Integración con Firebase SDK v11.6.1 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, deleteDoc, onSnapshot, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ID de la aplicación asignado para el guardado de datos
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'inspeccion-flota-app';
+        
+        let firebaseConfig;
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        } catch(e) {
+            console.warn("No se pudo iniciar la configuración de Firebase", e);
+        }
+
+        let localInspections = [];
+        let isUsingFirebase = false;
+        let db, auth, user;
+
+        // Intentar conectar con la nube
+        async function startDatabase() {
+            const statusDot = document.getElementById('db-status-dot');
+            const statusText = document.getElementById('db-status-text');
+            const statusBadge = document.getElementById('db-status-badge');
+
+            if (firebaseConfig) {
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    // Autenticación segura requerida
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        const credential = await signInWithCustomToken(auth, __initial_auth_token);
+                        user = credential.user;
+                    } else {
+                        const credential = await signInAnonymously(auth);
+                        user = credential.user;
+                    }
+
+                    if (user) {
+                        isUsingFirebase = true;
+                        statusDot.className = "h-2 w-2 rounded-full bg-emerald-400";
+                        statusText.textContent = "Nube Conectada";
+                        statusBadge.className = "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200";
+                        
+                        // Escucha de novedades en tiempo real desde Firestore
+                        const publicInspectionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'inspections');
+                        
+                        onSnapshot(publicInspectionsRef, (snapshot) => {
+                            const tempInspections = [];
+                            snapshot.forEach((doc) => {
+                                tempInspections.push({ id: doc.id, ...doc.data() });
+                            });
+                            // Ordenar localmente por orden cronológico inverso
+                            tempInspections.sort((a, b) => new Date(b.timestamp || b.fecha) - new Date(a.timestamp || a.fecha));
+                            localInspections = tempInspections;
+                            updateInspectionsUI();
+                            
+                            // Mostrar alerta visual en pestaña de historial
+                            const historyBadge = document.getElementById('history-badge');
+                            const activeTab = document.getElementById('btn-tab-history').classList.contains('active');
+                            if (!activeTab && tempInspections.length > 0) {
+                                historyBadge.classList.remove('hidden');
+                            }
+                        }, (error) => {
+                            console.error("Fallo lectura Firebase:", error);
+                            showToast("Error al sincronizar datos.");
+                        });
+                    }
+                } catch (error) {
+                    console.error("Fallo inicialización Firebase:", error);
+                    setupDemoMode();
+                }
+            } else {
+                setupDemoMode();
+            }
+        }
+
+        // Modo offline / simulado si no hay internet o credenciales
+        function setupDemoMode() {
+            const statusDot = document.getElementById('db-status-dot');
+            const statusText = document.getElementById('db-status-text');
+            const statusBadge = document.getElementById('db-status-badge');
+            
+            isUsingFirebase = false;
+            statusDot.className = "h-2 w-2 rounded-full bg-amber-400";
+            statusText.textContent = "Modo Local (Demo)";
+            statusBadge.className = "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200";
+            
+            // Registros de prueba iniciales
+            localInspections = [
+                {
+                    id: "local-demo-1",
+                    fecha: new Date().toISOString().split('T')[0],
+                    timestamp: new Date().toISOString(),
+                    patente: "AF999ZZ",
+                    interno: "402",
+                    empresa: "Remises Express",
+                    marca: "Chevrolet",
+                    modelo_ano: "Spin / 2022",
+                    chofer: "Carlos Gomez",
+                    inspector: "Claudio Rossi",
+                    resultado_final: "APROBADO",
+                    observaciones: "Unidad limpia y bien presentada.",
+                    indumentaria: "BUENO",
+                    hab_remis_estado: "SI",
+                    seg_remis_estado: "SI",
+                    vtv_estado: "SI",
+                    registro_estado: "SI",
+                    cedula_azul_estado: "SI",
+                    app_remis_estado: "SI",
+                    oblea_gnc_estado: "SI",
+                    matafuego_estado: "SI",
+                    aire_estado: "SI",
+                    calefaccion_estado: "SI",
+                    chapa: "BUENO",
+                    parabrisas: "BUENO",
+                    escobillas: "BUENO",
+                    cinturones: "BUENO",
+                    neu_del: "BUENO",
+                    neu_tras: "BUENO",
+                    luces_del: "BUENO",
+                    luces_tras: "BUENO",
+                    limpieza: "BUENO",
+                    levantacristales: "BUENO",
+                    cerraduras: "BUENO"
+                },
+                {
+                    id: "local-demo-2",
+                    fecha: new Date().toISOString().split('T')[0],
+                    timestamp: new Date(Date.now() - 3600000).toISOString(),
+                    patente: "AE412OP",
+                    interno: "123",
+                    empresa: "Unión Trans",
+                    marca: "Renault",
+                    modelo_ano: "Logan / 2020",
+                    chofer: "Juan Martinez",
+                    inspector: "Claudio Rossi",
+                    resultado_final: "SUSPENDIDO",
+                    observaciones: "VTV de remís vencida y sin matafuego en la cabina.",
+                    indumentaria: "REGULAR",
+                    hab_remis_estado: "SI",
+                    seg_remis_estado: "SI",
+                    vtv_estado: "NO",
+                    vtv_vto: "2026-06-01",
+                    registro_estado: "SI",
+                    cedula_azul_estado: "SI",
+                    app_remis_estado: "SI",
+                    oblea_gnc_estado: "SI",
+                    matafuego_estado: "NO",
+                    aire_estado: "SI",
+                    calefaccion_estado: "SI",
+                    chapa: "REGULAR",
+                    parabrisas: "MALO",
+                    escobillas: "BUENO",
+                    cinturones: "BUENO",
+                    neu_del: "REGULAR",
+                    neu_tras: "BUENO",
+                    luces_del: "BUENO",
+                    luces_tras: "BUENO",
+                    limpieza: "BUENO",
+                    levantacristales: "BUENO",
+                    cerraduras: "BUENO"
+                }
+            ];
+            updateInspectionsUI();
+        }
+
+        async function saveInspectionToDatabase(data) {
+            if (isUsingFirebase) {
+                if (!auth.currentUser) {
+                    showToast("Sesión desautenticada.");
+                    return false;
+                }
+                try {
+                    const publicInspectionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'inspections');
+                    await addDoc(publicInspectionsRef, data);
+                    return true;
+                } catch (error) {
+                    console.error("Error guardando reporte:", error);
+                    showToast("No se pudo conectar a la base de datos.");
+                    return false;
+                }
+            } else {
+                data.id = "local-" + Math.random().toString(36).substring(2, 9);
+                localInspections.unshift(data);
+                updateInspectionsUI();
+                return true;
+            }
+        }
+
+        async function deleteInspectionFromDatabase(id) {
+            if (isUsingFirebase) {
+                if (!auth.currentUser) return false;
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'inspections', id);
+                    await deleteDoc(docRef);
+                    showToast("Inspección eliminada correctamente");
+                    return true;
+                } catch (error) {
+                    console.error("Error eliminando registro:", error);
+                    showToast("Error de conexión al eliminar.");
+                    return false;
+                }
+            } else {
+                localInspections = localInspections.filter(item => item.id !== id);
+                updateInspectionsUI();
+                showToast("Inspección eliminada del historial");
+                return true;
+            }
+        }
+
+        // Exponer funciones globales
+        window.saveInspectionToDatabase = saveInspectionToDatabase;
+        window.deleteInspectionFromDatabase = deleteInspectionFromDatabase;
+        window.getLocalInspections = () => localInspections;
+
+        window.addEventListener('load', () => {
+            startDatabase();
+        });
+    </script>
+
+    <script>
+        const requisitosExcluyentes = [
+            { id: "hab_remis", label: "HABILITACIÓN DE REMIS" },
+            { id: "seg_remis", label: "SEGURO DE REMIS" },
+            { id: "vtv", label: "VTV DE REMIS" },
+            { id: "registro", label: "REGISTRO CON CATEG D O SUPERIOR" },
+            { id: "cedula_azul", label: "CÉDULA AZUL (si corresponde)" },
+            { id: "app_remis", label: "CELULAR Y APP REMISES FUNCIONANDO" },
+            { id: "oblea_gnc", label: "OBLEA GNC" },
+            { id: "matafuego", label: "MATAFUEGO" },
+            { id: "aire", label: "AIRE ACONDICIONADO" },
+            { id: "calefaccion", label: "CALEFACCIÓN" }
+        ];
+
+        const estadoVehiculo = [
+            { id: "chapa", label: "ESTADO GENERAL CHAPA Y PINTURA" },
+            { id: "parabrisas", label: "PARABRISAS" },
+            { id: "escobillas", label: "ESCOBILLAS" },
+            { id: "cinturones", label: "CINTURONES DE SEGURIDAD" },
+            { id: "neu_del", label: "NEUMÁTICOS DELANTEROS" },
+            { id: "neu_tras", label: "NEUMÁTICOS TRASEROS" },
+            { id: "luces_del", label: "LUCES DELANTERAS" },
+            { id: "luces_tras", label: "LUCES TRASERAS" },
+            { id: "limpieza", label: "LIMPIEZA GENERAL" },
+            { id: "levantacristales", label: "LEVANTACRISTALES" },
+            { id: "cerraduras", label: "CERRADURAS DE PUERTAS" }
+        ];
+
+        // Configurar la fecha de hoy
+        function initDate() {
+            const today = new Date();
+            const dateString = today.toISOString().split('T')[0];
+            document.getElementById('fecha').value = dateString;
+            
+            const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+            document.getElementById('currentDateDisplay').textContent = today.toLocaleDateString('es-AR', options);
+        }
+
+        // Render de Requisitos Excluyentes (Fila de tabla)
+        function renderExcluyentes() {
+            const tbody = document.getElementById('excluyentesBody');
+            let html = '';
+            
+            requisitosExcluyentes.forEach((item, index) => {
+                const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                html += `
+                    <tr class="${bgClass}">
+                        <td class="px-4 py-3 text-sm font-semibold text-gray-800 align-middle">
+                            ${item.label}
+                        </td>
+                        <td class="px-4 py-3 align-middle text-center">
+                            <div class="flex radio-group radio-sino justify-center">
+                                <input type="radio" id="${item.id}_si" name="${item.id}_estado" value="SI">
+                                <label for="${item.id}_si" class="w-12 h-10">SI</label>
+                                
+                                <input type="radio" id="${item.id}_no" name="${item.id}_estado" value="NO">
+                                <label for="${item.id}_no" class="w-12 h-10">NO</label>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 align-middle">
+                            <input type="date" name="${item.id}_vto" class="w-full text-xs rounded border border-gray-300 p-1 md:p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // Render del Estado del Vehículo (Chapa, pintura, etc.)
+        function renderEstadoVehiculo() {
+            const ul = document.getElementById('estadoVehiculoList');
+            let html = '';
+
+            estadoVehiculo.forEach((item, index) => {
+                const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                html += `
+                    <li class="${bgClass} px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div class="text-sm font-semibold text-gray-800 sm:w-1/2">
+                            ${item.label}
+                        </div>
+                        <div class="flex radio-group radio-group-3 radio-estado sm:w-1/2">
+                            <input type="radio" id="${item.id}_bueno" name="${item.id}" value="BUENO">
+                            <label for="${item.id}_bueno" class="flex-1 text-center py-2.5">BUENO</label>
+                            
+                            <input type="radio" id="${item.id}_regular" name="${item.id}" value="REGULAR">
+                            <label for="${item.id}_regular" class="flex-1 text-center py-2.5 border-l-0">REGULAR</label>
+                            
+                            <input type="radio" id="${item.id}_malo" name="${item.id}" value="MALO">
+                            <label for="${item.id}_malo" class="flex-1 text-center py-2.5">MALO</label>
+                        </div>
+                    </li>
+                `;
+            });
+            ul.innerHTML = html;
+        }
+
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const icon = document.getElementById(`icon-${sectionId}`);
+            
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                icon.classList.add('rotate-180');
+            } else {
+                section.style.display = 'none';
+                icon.classList.remove('rotate-180');
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.className = "show";
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        // Cambiar entre la vista de formulario y el historial
+        function switchTab(tab) {
+            const tabForm = document.getElementById('tab-content-form');
+            const tabHistory = document.getElementById('tab-content-history');
+            const btnForm = document.getElementById('btn-tab-form');
+            const btnHistory = document.getElementById('btn-tab-history');
+            const historyBadge = document.getElementById('history-badge');
+
+            if (tab === 'form') {
+                tabForm.classList.remove('hidden');
+                tabHistory.classList.add('hidden');
+                btnForm.classList.add('active');
+                btnHistory.classList.remove('active');
+            } else {
+                tabForm.classList.add('hidden');
+                tabHistory.classList.remove('hidden');
+                btnForm.classList.remove('active');
+                btnHistory.classList.add('active');
+                historyBadge.classList.add('hidden');
+                
+                applyFilters();
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function submitInspection(veredicto) {
+            const form = document.getElementById('inspectionForm');
+            
+            // Validaciones nativas
+            if (!form.reportValidity()) {
+                document.getElementById('datos-generales').style.display = 'block';
+                document.getElementById('icon-datos-generales').classList.add('rotate-180');
+                showToast("Complete los campos de Datos Generales.");
+                return;
+            }
+
+            const inspectorValue = document.getElementById('inspector_input').value.trim();
+            if (!inspectorValue) {
+                document.getElementById('cierre').style.display = 'block';
+                document.getElementById('icon-cierre').classList.add('rotate-180');
+                showToast("Debe ingresar el nombre del inspector.");
+                return;
+            }
+
+            // Validar que se seleccionó cada punto de la inspección
+            let valid = true;
+            requisitosExcluyentes.forEach(req => {
+                const isSelected = form.querySelector(`input[name="${req.id}_estado"]:checked`);
+                if (!isSelected) valid = false;
+            });
+            estadoVehiculo.forEach(est => {
+                const isSelected = form.querySelector(`input[name="${est.id}"]:checked`);
+                if (!isSelected) valid = false;
+            });
+
+            if (!valid) {
+                showToast("Faltan seleccionar calificaciones en los ítems.");
+                document.getElementById('excluyentes').style.display = 'block';
+                document.getElementById('icon-excluyentes').classList.add('rotate-180');
+                document.getElementById('estado-vehiculo').style.display = 'block';
+                document.getElementById('icon-estado-vehiculo').classList.add('rotate-180');
+                return;
+            }
+            
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            data.resultado_final = veredicto; 
+            data.timestamp = new Date().toISOString();
+
+            localStorage.setItem('fleet_inspector_name', inspectorValue);
+            
+            const savedSuccessfully = await window.saveInspectionToDatabase(data);
+
+            if (savedSuccessfully) {
+                const textReport = generateReportText(data, veredicto);
+                openShareModal(textReport, veredicto);
+            }
+        }
+
+        // Generar texto estructurado para reportes copiados
+        function generateReportText(data, veredicto) {
+            const icon = veredicto === 'APROBADO' ? '✅' : '⛔';
+            const cleanPatente = data.patente.toUpperCase().trim();
+            
+            let text = `*INSPECCIÓN DE AUTO - ${veredicto} ${icon}*\n\n`;
+            text += `📅 *Fecha:* ${data.fecha}\n`;
+            text += `🏢 *Empresa:* ${data.empresa}\n`;
+            text += `🔢 *Interno:* ${data.interno}\n`;
+            text += `🚗 *Patente:* ${cleanPatente}\n`;
+            text += `🚘 *Auto:* ${data.marca} ${data.modelo_ano}\n`;
+            text += `🧑‍✈️ *Chofer:* ${data.chofer}\n`;
+            text += `📝 *Inspector:* ${data.inspector}\n\n`;
+
+            let faltantes = [];
+            requisitosExcluyentes.forEach(req => {
+                const estado = data[`${req.id}_estado`];
+                const vto = data[`${req.id}_vto`];
+                if (estado === 'NO') {
+                    let log = `- ${req.label}`;
+                    if (vto) log += ` (Vence: ${vto})`;
+                    faltantes.push(log);
+                }
+            });
+            
+            if (faltantes.length > 0) {
+                text += `*⚠️ DOCUMENTACIÓN FALTANTE:*\n${faltantes.join('\n')}\n\n`;
+            }
+
+            let fallas = [];
+            estadoVehiculo.forEach(est => {
+                const valor = data[est.id];
+                if (valor === 'MALO' || valor === 'REGULAR') {
+                    fallas.push(`- ${est.label}: *${valor}*`);
+                }
+            });
+            
+            const indumentaria = data['indumentaria'];
+            if (indumentaria === 'MALO' || indumentaria === 'REGULAR') {
+                fallas.push(`- Prolijidad Conductor: *${indumentaria}*`);
+            }
+
+            if (fallas.length > 0) {
+                text += `*🔧 DETALLE DE FALLAS:*\n${fallas.join('\n')}\n\n`;
+            }
+
+            if (data.observaciones && data.observaciones.trim() !== '') {
+                text += `*📌 OBSERVACIONES GENERALES:*\n${data.observaciones.trim()}\n`;
+            }
+
+            return text;
+        }
+
+        function openShareModal(textReport, veredicto) {
+            const modal = document.getElementById('shareModal');
+            const modalContent = document.getElementById('shareModalContent');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalHeaderBg = document.getElementById('modalHeaderBg');
+            const modalIcon = document.getElementById('modalIcon');
+            const modalSubtitle = document.getElementById('modalSubtitle');
+
+            modalTitle.textContent = `Unidad ${veredicto}`;
+            
+            if (veredicto === 'APROBADO') {
+                modalHeaderBg.className = "p-6 text-center bg-emerald-600 text-white";
+                modalIcon.className = "fa-solid fa-check text-3xl text-emerald-600";
+                modalSubtitle.textContent = "Unidad aprobada para circular";
+            } else {
+                modalHeaderBg.className = "p-6 text-center bg-red-600 text-white";
+                modalIcon.className = "fa-solid fa-ban text-3xl text-red-600";
+                modalSubtitle.textContent = "La unidad ha sido inhabilitada";
+            }
+
+            document.getElementById('reportTextarea').value = textReport;
+            
+            // Re-establecer botón de copiar
+            document.getElementById('copyText').textContent = "Copiar Reporte";
+            document.getElementById('copyIcon').className = "fa-regular fa-copy mr-2 text-xl";
+            document.getElementById('btnCopy').className = "w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none shadow-sm transition-colors";
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeShareModal() {
+            const modal = document.getElementById('shareModal');
+            const modalContent = document.getElementById('shareModalContent');
+            
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                clearForm();
+            }, 300);
+        }
+
+        // Copiado con fallback nativo compatible
+        function copyReportToClipboard() {
+            const textarea = document.getElementById('reportTextarea');
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+
+            try {
+                document.execCommand('copy');
+                
+                const btnCopy = document.getElementById('btnCopy');
+                const copyText = document.getElementById('copyText');
+                const copyIcon = document.getElementById('copyIcon');
+                
+                copyText.textContent = "¡Copiado!";
+                copyIcon.className = "fa-solid fa-check mr-2 text-xl";
+                btnCopy.className = "w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-semibold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none shadow-sm transition-colors";
+                
+                window.getSelection().removeAllRanges();
+                showToast("¡Texto copiado al portapapeles!");
+            } catch (err) {
+                showToast("Presione sobre la caja de texto para copiar manualmente.");
+            }
+        }
+
+        function applyFilters() {
+            const search = document.getElementById('filter-search').value.toLowerCase().trim();
+            const veredicto = document.getElementById('filter-veredicto').value;
+            const tiempo = document.getElementById('filter-tiempo').value;
+            
+            const list = window.getLocalInspections();
+            
+            const filtered = list.filter(item => {
+                const matchesSearch = !search || 
+                    (item.patente && item.patente.toLowerCase().includes(search)) ||
+                    (item.chofer && item.chofer.toLowerCase().includes(search)) ||
+                    (item.inspector && item.inspector.toLowerCase().includes(search)) ||
+                    (item.empresa && item.empresa.toLowerCase().includes(search)) ||
+                    (item.interno && item.interno.toString().includes(search));
+
+                const matchesVeredicto = veredicto === 'TODOS' || item.resultado_final === veredicto;
+
+                let matchesTiempo = true;
+                if (tiempo === 'HOY') {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    matchesTiempo = item.fecha === todayStr;
+                } else if (tiempo === '7DIAS') {
+                    const diffTime = Math.abs(new Date() - new Date(item.fecha));
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    matchesTiempo = diffDays <= 7;
+                }
+
+                return matchesSearch && matchesVeredicto && matchesTiempo;
+            });
+
+            renderFilteredInspections(filtered);
+            updateStatistics(filtered);
+        }
+
+        function updateStatistics(filteredList) {
+            const total = filteredList.length;
+            const aprobados = filteredList.filter(i => i.resultado_final === 'APROBADO').length;
+            const suspendidos = filteredList.filter(i => i.resultado_final === 'SUSPENDIDO').length;
+
+            document.getElementById('stats-total').textContent = total;
+            document.getElementById('stats-aprobados').textContent = aprobados;
+            document.getElementById('stats-suspendidos').textContent = suspendidos;
+        }
+
+        function renderFilteredInspections(filteredList) {
+            const container = document.getElementById('inspectionsListContainer');
+            
+            if (filteredList.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 bg-white rounded-lg border border-gray-200">
+                        <i class="fa-solid fa-clipboard-question text-3xl text-gray-300 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">No hay registros con los filtros seleccionados.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            filteredList.forEach(item => {
+                const isAprobado = item.resultado_final === 'APROBADO';
+                const badgeClass = isAprobado 
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
+                    : "bg-red-100 text-red-800 border border-red-200";
+                
+                let dateFormatted = item.fecha;
+                try {
+                    const d = new Date(item.fecha + "T00:00:00");
+                    dateFormatted = d.toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit', year: 'numeric'});
+                } catch(e) {}
+
+                let alertBullets = [];
+                requisitosExcluyentes.forEach(req => {
+                    if (item[`${req.id}_estado`] === 'NO') alertBullets.push(req.label);
+                });
+
+                const alertHeader = alertBullets.length > 0 
+                    ? `<div class="mt-2 text-xs text-red-600 font-semibold truncate"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Faltan: ${alertBullets.join(', ')}</div>` 
+                    : '';
+
+                html += `
+                    <div class="bg-white rounded-lg border border-gray-200 shadow-sm hover:border-blue-300 transition-all duration-200 overflow-hidden">
+                        <div class="p-4 flex justify-between items-start gap-3">
+                            <div class="flex-1 min-w-0 cursor-pointer" onclick="openDetailModal('${item.id}')">
+                                <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                                    <span class="text-xs font-bold text-gray-500">${dateFormatted}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${badgeClass}">${item.resultado_final}</span>
+                                    <span class="text-xs text-gray-400 font-medium">Interno ${item.interno || '-'}</span>
+                                </div>
+                                <h4 class="text-lg font-bold text-gray-900 tracking-tight uppercase">${item.patente}</h4>
+                                <p class="text-xs text-gray-500 truncate"><span class="font-semibold text-gray-700">Chofer:</span> ${item.chofer} | <span class="font-semibold text-gray-700">Empresa:</span> ${item.empresa}</p>
+                                ${alertHeader}
+                            </div>
+                            <div class="flex gap-1.5 flex-shrink-0">
+                                <button onclick="openDetailModal('${item.id}')" class="h-9 w-9 flex items-center justify-center bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md text-gray-600 hover:text-blue-600 transition-colors" title="Detalles">
+                                    <i class="fa-solid fa-eye text-sm"></i>
+                                </button>
+                                <button onclick="triggerDeleteConfirm('${item.id}')" class="h-9 w-9 flex items-center justify-center bg-red-50 hover:bg-red-100 border border-red-200 rounded-md text-red-500 hover:text-red-700 transition-colors" title="Eliminar">
+                                    <i class="fa-solid fa-trash-can text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function updateInspectionsUI() {
+            applyFilters();
+        }
+
+        function openDetailModal(id) {
+            const list = window.getLocalInspections();
+            const item = list.find(x => x.id === id);
+            if (!item) return;
+
+            const modal = document.getElementById('detailModal');
+            const modalContent = document.getElementById('detailModalContent');
+            const body = document.getElementById('detailModalBody');
+
+            let dateFormatted = item.fecha;
+            try {
+                const d = new Date(item.fecha + "T00:00:00");
+                dateFormatted = d.toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit', year: 'numeric'});
+            } catch(e) {}
+
+            let docListHtml = '';
+            requisitosExcluyentes.forEach(req => {
+                const presenta = item[`${req.id}_estado`] === 'SI';
+                const color = presenta ? 'text-emerald-600' : 'text-red-600';
+                const icon = presenta ? 'fa-circle-check' : 'fa-circle-xmark';
+                const vto = item[`${req.id}_vto` ] ? `<span class="text-xs text-gray-500 ml-2">(Vto: ${item[`${req.id}_vto`]})</span>` : '';
+                
+                docListHtml += `
+                    <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100">
+                        <span class="font-medium text-gray-700">${req.label}</span>
+                        <div class="flex items-center gap-1">
+                            <span class="font-bold ${color}">${item[`${req.id}_estado`] || '-'}</span>
+                            <i class="fa-solid ${icon} ${color}"></i>
+                            ${vto}
+                        </div>
+                    </div>
+                `;
+            });
+
+            let stateListHtml = '';
+            estadoVehiculo.forEach(est => {
+                const valor = item[est.id] || '-';
+                let colorClass = 'text-gray-500';
+                if (valor === 'BUENO') colorClass = 'text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded';
+                if (valor === 'REGULAR') colorClass = 'text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded';
+                if (valor === 'MALO') colorClass = 'text-red-600 bg-red-50 px-1.5 py-0.5 rounded';
+
+                stateListHtml += `
+                    <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100">
+                        <span class="font-medium text-gray-700">${est.label}</span>
+                        <span class="font-bold text-[10px] ${colorClass}">${valor}</span>
+                    </div>
+                `;
+            });
+
+            const isAprobado = item.resultado_final === 'APROBADO';
+            const statusBadge = isAprobado 
+                ? '<span class="px-2.5 py-1 text-xs font-bold rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">APROBADO</span>'
+                : '<span class="px-2.5 py-1 text-xs font-bold rounded-md bg-red-100 text-red-800 border border-red-200">SUSPENDIDO</span>';
+
+            body.innerHTML = `
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <div>
+                        <span class="text-xs text-gray-400 font-semibold block">${dateFormatted}</span>
+                        <h4 class="text-xl font-bold text-gray-900 uppercase">${item.patente}</h4>
+                    </div>
+                    <div>${statusBadge}</div>
+                </div>
+
+                <div class="bg-gray-50 p-3 rounded-lg text-xs space-y-1 border border-gray-100">
+                    <p><span class="text-gray-500">Empresa Prestadora:</span> <strong class="text-gray-800">${item.empresa || '-'}</strong></p>
+                    <p><span class="text-gray-500">Interno:</span> <strong class="text-gray-800">${item.interno || '-'}</strong></p>
+                    <p><span class="text-gray-500">Vehículo:</span> <strong class="text-gray-800">${item.marca || '-'} ${item.modelo_ano || ''}</strong></p>
+                    <p><span class="text-gray-500">Chofer:</span> <strong class="text-gray-800">${item.chofer || '-'}</strong></p>
+                    <p><span class="text-gray-500">Inspector:</span> <strong class="text-gray-800">${item.inspector || '-'}</strong></p>
+                </div>
+
+                <div class="space-y-2">
+                    <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider"><i class="fa-solid fa-folder-open text-blue-500"></i> Documentación Excluyente</h5>
+                    <div class="border border-gray-100 rounded-lg p-2 bg-white">${docListHtml}</div>
+                </div>
+
+                <div class="space-y-2">
+                    <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider"><i class="fa-solid fa-car text-blue-500"></i> Estado del Automotor</h5>
+                    <div class="border border-gray-100 rounded-lg p-2 bg-white">${stateListHtml}</div>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs">
+                    <strong class="text-blue-800 block mb-1">Observaciones:</strong>
+                    <p class="text-blue-900">${item.observaciones || 'Sin anotaciones adicionales.'}</p>
+                </div>
+            `;
+
+            const btnCopyDetail = document.getElementById('btnCopyDetail');
+            btnCopyDetail.onclick = function() {
+                const textReport = generateReportText(item, item.resultado_final);
+                navigator.clipboard.writeText(textReport).then(() => {
+                    showToast("¡Reporte copiado!");
+                }).catch(() => {
+                    const tempText = document.createElement("textarea");
+                    tempText.value = textReport;
+                    document.body.appendChild(tempText);
+                    tempText.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(tempText);
+                    showToast("¡Reporte copiado!");
+                });
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeDetailModal() {
+            const modal = document.getElementById('detailModal');
+            const modalContent = document.getElementById('detailModalContent');
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        let itemToDeleteId = null;
+
+        function triggerDeleteConfirm(id) {
+            itemToDeleteId = id;
+            const modal = document.getElementById('deleteModal');
+            const modalContent = document.getElementById('deleteModalContent');
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+
+            document.getElementById('btnConfirmDelete').onclick = async function() {
+                if (itemToDeleteId) {
+                    await window.deleteInspectionFromDatabase(itemToDeleteId);
+                    closeDeleteModal();
+                }
+            };
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            const modalContent = document.getElementById('deleteModalContent');
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                itemToDeleteId = null;
+            }, 300);
+        }
+
+        function clearForm() {
+            const form = document.getElementById('inspectionForm');
+            form.reset();
+            
+            initDate();
+            
+            const prevInspector = localStorage.getItem('fleet_inspector_name');
+            if (prevInspector) {
+                document.getElementById('inspector_input').value = prevInspector;
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showToast("Planilla en blanco.");
+        }
+
+        function exportToExcel() {
+            const list = window.getLocalInspections();
+            if (list.length === 0) {
+                showToast("No hay registros para exportar.");
+                return;
+            }
+
+            // Cabeceras del Excel
+            const headers = [
+                "Fecha", "Resultado Final", "Patente", "Nro Interno", "Empresa Prestadora", "Marca y Modelo", "Chofer", "Inspector a cargo",
+                "Indumentaria Chofer", "Hab. Remis", "Vto Hab.", "Seguro Remis", "Vto Seguro", "VTV", "Vto VTV", "Registro Conductor", "Vto Registro", 
+                "Cedula Azul", "Vto Cedula", "App Remis", "Oblea GNC", "Vto GNC", "Matafuego", "Vto Matafuego", "Aire Acondicionado", "Vto Aire", 
+                "Calefaccion", "Vto Calef.", "Chapa y Pintura", "Parabrisas", "Escobillas", "Cinturones", "Neu. Delanteros", "Neu. Traseros", 
+                "Luces Del.", "Luces Tras.", "Limpieza", "Levantacristales", "Cerraduras", "Observaciones Generales"
+            ];
+
+            const rows = list.map(item => [
+                item.fecha || "",
+                item.resultado_final || "",
+                (item.patente || "").toUpperCase(),
+                item.interno || "",
+                item.empresa || "",
+                `${item.marca || ""} ${item.modelo_ano || ""}`.trim(),
+                item.chofer || "",
+                item.inspector || "",
+                item.indumentaria || "",
+                item.hab_remis_estado || "", item.hab_remis_vto || "",
+                item.seg_remis_estado || "", item.seg_remis_vto || "",
+                item.vtv_estado || "", item.vtv_vto || "",
+                item.registro_estado || "", item.registro_vto || "",
+                item.cedula_azul_estado || "", item.cedula_azul_vto || "",
+                item.app_remis_estado || "",
+                item.oblea_gnc_estado || "", item.oblea_gnc_vto || "",
+                item.matafuego_estado || "", item.matafuego_vto || "",
+                item.aire_estado || "", item.aire_vto || "",
+                item.calefaccion_estado || "", item.calefaccion_vto || "",
+                item.chapa || "",
+                item.parabrisas || "",
+                item.escobillas || "",
+                item.cinturones || "",
+                item.neu_del || "",
+                item.neu_tras || "",
+                item.luces_del || "",
+                item.luces_tras || "",
+                item.limpieza || "",
+                item.levantacristales || "",
+                item.cerraduras || "",
+                (item.observaciones || "").replace(/"/g, '""').replace(/\n/g, " ")
+            ]);
+
+            // Formateado nativo CSV en español (Punto y coma ";" + UTF-8 BOM)
+            let csvContent = "\uFEFF"; 
+            csvContent += headers.map(h => `"${h}"`).join(";") + "\r\n";
+
+            rows.forEach(row => {
+                csvContent += row.map(val => `"${val}"`).join(";") + "\r\n";
+            });
+
+            // Disparar descarga del archivo CSV
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Planilla_Inspecciones_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showToast("¡Planilla descargada con éxito!");
+        }
+
+        window.onload = function() {
+            initDate();
+            renderExcluyentes();
+            renderEstadoVehiculo();
+            
+            // Colapsar el listado de estado en móviles para comodidad
+            toggleSection('estado-vehiculo');
+            
+            const prevInspector = localStorage.getItem('fleet_inspector_name');
+            if (prevInspector) {
+                document.getElementById('inspector_input').value = prevInspector;
+            }
+        };
+    </script>
+</body>
+</html>
