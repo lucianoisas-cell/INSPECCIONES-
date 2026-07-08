@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspección de Automotores</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .radio-group input[type="radio"] { display: none; }
+        .radio-group label { display: flex; align-items: center; justify-content: center; padding: 0.5rem; border: 1px solid #d1d5db; cursor: pointer; transition: all 0.2s ease-in-out; font-size: 0.875rem; font-weight: 500; }
+        .radio-group label:first-of-type { border-top-left-radius: 0.375rem; border-bottom-left-radius: 0.375rem; }
+        .radio-group label:last-of-type { border-top-right-radius: 0.375rem; border-bottom-right-radius: 0.375rem; border-left: none; }
+        .radio-sino input[value="SI"]:checked + label { background-color: #10b981; color: white; border-color: #10b981; }
+        .radio-sino input[value="NO"]:checked + label { background-color: #ef4444; color: white; border-color: #ef4444; }
+        .radio-estado input[value="BUENO"]:checked + label { background-color: #10b981; color: white; border-color: #10b981; }
+        .radio-estado input[value="REGULAR"]:checked + label { background-color: #f59e0b; color: white; border-color: #f59e0b; }
+        .radio-estado input[value="MALO"]:checked + label { background-color: #ef4444; color: white; border-color: #ef4444; }
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 100; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 14px; opacity: 0; transition: opacity 0.3s, bottom 0.3s; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+        .tab-btn.active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: 700; }
+    </style>
+</head>
+<body class="text-gray-800 pb-20">
+
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-40">
+        <div class="max-w-3xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold truncate"><i class="fa-solid fa-clipboard-check mr-2"></i> Inspección de Flota</h1>
+            <span id="db-status-text" class="text-xs opacity-80">Modo Local</span>
+        </div>
+    </header>
+
+    <nav class="bg-white border-b border-gray-200 sticky top-[61px] z-30 shadow-sm">
+        <div class="max-w-3xl mx-auto flex justify-around">
+            <button id="btn-tab-form" onclick="switchTab('form')" class="tab-btn active py-3.5 text-center flex-1 font-medium text-sm text-gray-500 hover:text-blue-600 transition-colors">Nueva</button>
+            <button id="btn-tab-history" onclick="switchTab('history')" class="tab-btn py-3.5 text-center flex-1 font-medium text-sm text-gray-500 hover:text-blue-600 transition-colors">Historial</button>
+        </div>
+    </nav>
+
+    <main class="max-w-3xl mx-auto p-4 mt-2">
+        <div id="tab-content-form">
+            <form id="inspectionForm" class="space-y-6">
+                <section class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-4">1. Datos Generales</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="date" id="fecha" name="fecha" required class="w-full rounded-md border border-gray-300 p-2">
+                        <input type="text" name="empresa" required class="w-full rounded-md border border-gray-300 p-2" placeholder="Empresa">
+                        <input type="text" name="interno" required class="w-full rounded-md border border-gray-300 p-2" placeholder="Interno">
+                        <input type="text" name="patente" required class="w-full rounded-md border border-gray-300 p-2 uppercase" placeholder="Patente">
+                        <input type="text" name="chofer" required class="w-full rounded-md border border-gray-300 p-2" placeholder="Chofer">
+                    </div>
+                </section>
+                
+                <section class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-4">2. Requisitos</h2>
+                    <div id="excluyentesBody" class="space-y-2"></div>
+                </section>
+
+                <div class="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-lg z-40 flex gap-2">
+                    <button type="button" onclick="submitInspection('SUSPENDIDO')" class="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold">Suspender</button>
+                    <button type="button" onclick="submitInspection('APROBADO')" class="flex-1 bg-emerald-600 text-white py-3 rounded-lg font-bold">Aprobar</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="tab-content-history" class="hidden space-y-4">
+            <input type="text" id="filter-search" oninput="applyFilters()" class="w-full p-3 border rounded-lg" placeholder="Buscar...">
+            <div id="inspectionsListContainer" class="space-y-3"></div>
+        </div>
+
+        <footer class="text-center py-8 text-xs text-gray-400 mt-12 border-t border-gray-200/60 max-w-sm mx-auto">
+            <div class="flex flex-col items-center justify-center gap-2 mb-2">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Aerolineas_Argentinas_logo.svg/200px-Aerolineas_Argentinas_logo.svg.png" alt="Logo" class="h-10 w-auto">
+                <p class="font-medium text-gray-500">Propiedad de Marcelo Luciano Isas</p>
+            </div>
+            <p class="text-[10px]">© Inspección de Flota Mobile</p>
+        </footer>
+    </main>
+
+    <div id="shareModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-[60] px-4">
+        <div class="bg-white rounded-xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="text-lg font-bold text-center">Inspección Guardada</h3>
+            <textarea id="reportTextarea" readonly class="w-full h-40 p-2 text-xs border rounded"></textarea>
+            <button onclick="closeShareModal()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        let localInspections = JSON.parse(localStorage.getItem('inspecciones_locales') || '[]');
+        const requisitos = ["Habilitación", "Seguro", "VTV", "Registro", "App", "Matafuego"];
+        
+        function renderExcluyentes() {
+            document.getElementById('excluyentesBody').innerHTML = requisitos.map(r => `
+                <div class="flex justify-between items-center p-2 border-b">
+                    <span class="text-sm font-medium">${r}</span>
+                    <div class="flex radio-group radio-sino"><input type="radio" id="${r}_si" name="${r}" value="SI"><label for="${r}_si" class="w-10 h-8">SI</label><input type="radio" id="${r}_no" name="${r}" value="NO"><label for="${r}_no" class="w-10 h-8">NO</label></div>
+                </div>`).join('');
+        }
+        
+        async function submitInspection(res) {
+            const f = document.getElementById('inspectionForm');
+            const d = Object.fromEntries(new FormData(f).entries());
+            d.id = "id-" + Date.now();
+            d.resultado = res;
+            localInspections.unshift(d);
+            localStorage.setItem('inspecciones_locales', JSON.stringify(localInspections));
+            document.getElementById('reportTextarea').value = `Inspección ${res} - Patente: ${d.patente}`;
+            document.getElementById('shareModal').classList.remove('hidden');
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const q = document.getElementById('filter-search').value.toLowerCase();
+            document.getElementById('inspectionsListContainer').innerHTML = localInspections
+                .filter(i => (i.patente||'').toLowerCase().includes(q))
+                .map(i => `<div class="bg-white p-4 border rounded shadow-sm flex justify-between">
+                    <div><h4 class="font-bold">${i.patente}</h4><p class="text-sm">${i.chofer || ''}</p></div>
+                    <button onclick="deleteIns('${i.id}')" class="text-red-500">Borrar</button>
+                </div>`).join('');
+        }
+
+        function deleteIns(id) {
+            localInspections = localInspections.filter(i => i.id !== id);
+            localStorage.setItem('inspecciones_locales', JSON.stringify(localInspections));
+            applyFilters();
+        }
+
+        function switchTab(t) {
+            document.getElementById('tab-content-form').classList.toggle('hidden', t !== 'form');
+            document.getElementById('tab-content-history').classList.toggle('hidden', t !== 'history');
+        }
+
+        function closeShareModal() { document.getElementById('shareModal').classList.add('hidden'); document.getElementById('inspectionForm').reset(); }
+        window.onload = () => { renderExcluyentes(); applyFilters(); document.getElementById('fecha').valueAsDate = new Date(); };
+    </script>
+</body>
+</html>
