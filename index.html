@@ -2,648 +2,602 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-...
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inspección de Automotores</title>
+    <!-- Tailwind CSS para un diseño limpio y adaptabilidad móvil -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* gray-100 */
-        }
-        
-        /* Estilos optimizados para botones táctiles en celulares */
-        .radio-group input[type="radio"] {
-            display: none;
-        }
-        
-        .radio-group label {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.5rem;
-            border: 1px solid #d1d5db; /* gray-300 */
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        
-        .radio-group label:first-of-type {
-            border-top-left-radius: 0.375rem;
-            border-bottom-left-radius: 0.375rem;
-        }
-        
-        .radio-group label:last-of-type {
-            border-top-right-radius: 0.375rem;
-            border-bottom-right-radius: 0.375rem;
-            border-left: none;
-        }
-        
-        .radio-group-3 label:nth-of-type(2) {
-             border-left: none;
-        }
-
-        /* Colores activos para SI / NO (Excluyentes) */
-        .radio-sino input[value="SI"]:checked + label {
-            background-color: #10b981; /* emerald-500 */
-            color: white;
-            border-color: #10b981;
-        }
-        .radio-sino input[value="NO"]:checked + label {
-            background-color: #ef4444; /* red-500 */
-            color: white;
-            border-color: #ef4444;
-        }
-
-        /* Colores activos para BUENO / REGULAR / MALO (Estado del Vehículo) */
-        .radio-estado input[value="BUENO"]:checked + label {
-            background-color: #10b981; /* emerald-500 */
-            color: white;
-            border-color: #10b981;
-        }
-        .radio-estado input[value="REGULAR"]:checked + label {
-            background-color: #f59e0b; /* amber-500 */
-            color: white;
-            border-color: #f59e0b;
-        }
-        .radio-estado input[value="MALO"]:checked + label {
-            background-color: #ef4444; /* red-500 */
-            color: white;
-            border-color: #ef4444;
-        }
-
-        /* Notificación flotante de confirmación */
-        #toast {
-            visibility: hidden;
-            min-width: 250px;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 8px;
-            padding: 16px;
-            position: fixed;
-            z-index: 100;
-            left: 50%;
-            bottom: 30px;
-            transform: translateX(-50%);
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.3s, bottom 0.3s;
-        }
-
-        #toast.show {
-            visibility: visible;
-            opacity: 1;
-            bottom: 50px;
-        }
-
-        .tab-btn.active {
-            border-bottom: 3px solid #2563eb;
-            color: #2563eb;
-            font-weight: 700;
-        }
+        .accordion-content { transition: max-height 0.3s ease-out; overflow: hidden; }
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="text-gray-800 pb-20">
+<body class="bg-gray-100 min-h-screen font-sans antialiased text-gray-900">
 
-    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-40">
-        <div class="max-w-3xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold truncate"><i class="fa-solid fa-clipboard-check mr-2"></i> Inspección de Flota</h1>
-            <div class="flex items-center gap-2">
-                <span id="db-status-badge" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-blue-500 text-blue-100">
-                    <span class="h-2 w-2 rounded-full bg-blue-300 animate-pulse" id="db-status-dot"></span>
-                    <span id="db-status-text">Conectando...</span>
-                </span>
-                <div class="text-xs opacity-90 hidden sm:block" id="currentDateDisplay"></div>
+    <!-- Cabecera de la Aplicación -->
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg shadow-md shadow-blue-200">
+                    <i class="fa-solid fa-car-on text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-gray-800">Control de Flota</h1>
+                    <p id="db-status-text" class="text-xs font-semibold text-green-600 flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse"></span> Conectado a Sheets
+                    </p>
+                </div>
             </div>
+            
+            <!-- Barra de Navegación por Solapas -->
+            <nav class="flex gap-2">
+                <button id="tab-nueva" onclick="switchTab('nueva')" class="px-3 py-2 text-sm font-bold text-blue-600 border-b-2 border-blue-600 flex items-center gap-2 transition-all">
+                    <i class="fa-solid fa-clipboard-check"></i> <span class="hidden sm:inline">Nueva</span> Inspección
+                </button>
+                <button id="tab-historial" onclick="switchTab('historial')" class="px-3 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center gap-2 transition-all">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Historial <span class="hidden sm:inline">/ Novedades</span>
+                </button>
+            </nav>
         </div>
     </header>
 
-    <!-- Pestañas para cambiar entre Formulario e Historial -->
-    <nav class="bg-white border-b border-gray-200 sticky top-[61px] z-30 shadow-sm">
-        <div class="max-w-3xl mx-auto flex justify-around">
-            <button id="btn-tab-form" onclick="switchTab('form')" class="tab-btn active py-3.5 text-center flex-1 font-medium text-sm text-gray-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2">
-                <i class="fa-solid fa-square-plus text-base"></i> Nueva Inspección
-            </button>
-            <button id="btn-tab-history" onclick="switchTab('history')" class="tab-btn py-3.5 text-center flex-1 font-medium text-sm text-gray-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2 relative">
-                <i class="fa-solid fa-folder-open text-base"></i> Historial / Novedades
-                <span id="history-badge" class="hidden absolute top-2 right-4 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">New</span>
-            </button>
-        </div>
-    </nav>
-
-    <main class="max-w-3xl mx-auto p-4 mt-2">
+    <main class="max-w-4xl mx-auto px-4 py-6">
         
-        <!-- PESTAÑA 1: Formulario de Nueva Inspección -->
-        <div id="tab-content-form">
-            <form id="inspectionForm" class="space-y-6">
-                
-                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('datos-generales')">
-                        <h2 class="text-lg font-semibold text-gray-700">1. Datos Generales</h2>
-                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-200" id="icon-datos-generales"></i>
-                    </div>
-                    
-                    <div id="datos-generales" class="p-4 space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Inspección</label>
-                                <input type="date" id="fecha" name="fecha" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Empresa Prestadora</label>
-                                <input type="text" name="empresa" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre de la empresa">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Interno</label>
-                                <input type="text" name="interno" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: 104">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Patente / Dominio</label>
-                                <input type="text" name="patente" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500 uppercase" placeholder="Ej: AB123CD o ABC123">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Marca del Vehículo</label>
-                                <input type="text" name="marca" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Fiat">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Modelo / Año</label>
-                                <input type="text" name="modelo_ano" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Cronos / 2023">
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Chofer</label>
-                                <input type="text" name="chofer" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre completo del chofer">
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('excluyentes')">
-                        <h2 class="text-lg font-semibold text-gray-700">2. Requisitos Excluyentes</h2>
-                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-200" id="icon-excluyentes"></i>
-                    </div>
-                    
-                    <div id="excluyentes" class="p-0">
-                        <div class="bg-red-50 border-l-4 border-red-500 p-4 m-3 rounded-r-md">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-red-700 font-bold">
-                                        ATENCIÓN: Cualquier faltante de documentación (Requisitos Excluyentes) es motivo directo de SUSPENSIÓN de la unidad.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">Ítem / Documento</th>
-                                        <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Presenta</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Vencimiento</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200" id="excluyentesBody">
-                                    <!-- Se genera automáticamente con JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('estado-vehiculo')">
-                        <h2 class="text-lg font-semibold text-gray-700">3. Estado del Vehículo</h2>
-                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-200" id="icon-estado-vehiculo"></i>
-                    </div>
-                    
-                    <div id="estado-vehiculo" class="p-0">
-                        <ul class="divide-y divide-gray-200" id="estadoVehiculoList">
-                            <!-- Se genera automáticamente con JS -->
-                        </ul>
-                    </div>
-                </section>
-
-                <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer" onclick="toggleSection('cierre')">
-                        <h2 class="text-lg font-semibold text-gray-700">4. Cierre de Inspección</h2>
-                        <i class="fa-solid fa-chevron-up text-gray-500 transition-transform duration-200 transform rotate-180" id="icon-cierre"></i>
-                    </div>
-                    
-                    <div id="cierre" class="p-4 space-y-4">
-                        <div class="border-b pb-4 mb-4">
-                             <label class="block text-sm font-medium text-gray-700 mb-2">Indumentaria y prolijidad del conductor</label>
-                             <div class="flex radio-group radio-group-3 radio-estado w-full">
-                                <input type="radio" id="indumentaria_bueno" name="indumentaria" value="BUENO">
-                                <label for="indumentaria_bueno" class="flex-1 text-center py-2">BUENO</label>
-                                
-                                <input type="radio" id="indumentaria_regular" name="indumentaria" value="REGULAR">
-                                <label for="indumentaria_regular" class="flex-1 text-center py-2 border-l-0">REGULAR</label>
-                                
-                                <input type="radio" id="indumentaria_malo" name="indumentaria" value="MALO">
-                                <label for="indumentaria_malo" class="flex-1 text-center py-2">MALO</label>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Inspeccionado por (Inspector):</label>
-                            <input type="text" name="inspector" id="inspector_input" required class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre completo del inspector">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones Generales</label>
-                            <textarea name="observaciones" rows="3" class="w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Anotaciones de estado o desperfectos encontrados..."></textarea>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Botones fijos inferiores para facilitar el uso en celular -->
-                <div class="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
-                    <div class="max-w-3xl mx-auto flex gap-2 md:gap-4">
-                        <button type="button" onclick="clearForm()" class="bg-gray-200 text-gray-800 py-3 px-3 md:px-4 rounded-lg font-medium hover:bg-gray-300 transition-colors focus:outline-none flex-shrink-0" title="Limpiar planilla">
-                            <i class="fa-solid fa-eraser"></i> <span class="hidden md:inline ml-1">Limpiar</span>
-                        </button>
-                        <button type="button" onclick="submitInspection('SUSPENDIDO')" class="flex-1 bg-red-600 text-white py-3 px-2 md:px-4 rounded-lg font-medium hover:bg-red-700 transition-colors shadow-md flex items-center justify-center">
-                            <i class="fa-solid fa-ban mr-1.5 md:mr-2"></i> <span class="text-sm md:text-base">Suspender Vehículo</span>
-                        </button>
-                        <button type="button" onclick="submitInspection('APROBADO')" class="flex-1 bg-emerald-600 text-white py-3 px-2 md:px-4 rounded-lg font-medium hover:bg-emerald-700 transition-colors shadow-md flex items-center justify-center">
-                            <i class="fa-solid fa-check mr-1.5 md:mr-2"></i> <span class="text-sm md:text-base">Aprobar Vehículo</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="h-16"></div>
-            </form>
-        </div>
-
-        <!-- PESTAÑA 2: Panel de Base de Datos / Historial de Novedades -->
-        <div id="tab-content-history" class="hidden space-y-6">
+        <!-- ========================================== -->
+        <!-- SECCIÓN: FORMULARIO DE NUEVA INSPECCIÓN -->
+        <!-- ========================================== -->
+        <form id="inspectionForm" class="space-y-4">
             
-            <div class="grid grid-cols-3 gap-3">
-                <div class="bg-white p-3 rounded-lg border border-gray-200 text-center shadow-sm">
-                    <span class="block text-xs text-gray-500 font-medium uppercase">Inspeccionados</span>
-                    <span id="stats-total" class="text-2xl font-bold text-gray-800">0</span>
-                </div>
-                <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center shadow-sm">
-                    <span class="block text-xs text-emerald-600 font-medium uppercase">Aprobados</span>
-                    <span id="stats-aprobados" class="text-2xl font-bold text-emerald-700">0</span>
-                </div>
-                <div class="bg-red-50 p-3 rounded-lg border border-red-100 text-center shadow-sm">
-                    <span class="block text-xs text-red-600 font-medium uppercase">Suspendidos</span>
-                    <span id="stats-suspendidos" class="text-2xl font-bold text-red-700">0</span>
+            <!-- BLOQUE 1: DATOS GENERALES -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <button type="button" onclick="toggleSection('sec-datos')" class="w-full px-5 py-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-bold text-gray-700 border-b border-gray-200">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-id-card text-blue-500"></i> 1. Datos Generales</span>
+                    <i id="arrow-sec-datos" class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                </button>
+                <div id="sec-datos" class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Fecha</label>
+                        <input type="date" name="fecha" id="campo-fecha" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Empresa</label>
+                        <input type="text" name="empresa" placeholder="Ej. Canning" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Interno</label>
+                        <input type="text" name="interno" placeholder="Número de interno" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Patente</label>
+                        <input type="text" name="patente" placeholder="Dominio del coche" required class="w-full px-3 py-2 border border-gray-300 rounded-lg uppercase focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Marca</label>
+                        <input type="text" name="marca" placeholder="Ej. Fiat" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Modelo / Año</label>
+                        <input type="text" name="modelo" placeholder="Ej. Cronos 2025" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Chofer</label>
+                        <input type="text" name="chofer" placeholder="Nombre completo del conductor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
                 </div>
             </div>
 
-            <!-- Filtros de Búsqueda y Botón Exportar Excel -->
-            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-3">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                        <i class="fa-solid fa-filter text-blue-500"></i> Buscar e Inspeccionar
-                    </h3>
-                    <!-- Botón de descarga de planilla Excel -->
-                    <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs rounded-lg font-bold transition-all shadow-sm flex items-center gap-1.5">
-                        <i class="fa-solid fa-file-excel text-sm animate-pulse"></i> Exportar a Excel
+            <!-- BLOQUE 2: REQUISITOS EXCLUYENTES -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <button type="button" onclick="toggleSection('sec-excluyentes')" class="w-full px-5 py-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-bold text-gray-700 border-b border-gray-200">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-file-shield text-red-500"></i> 2. Requisitos Excluyentes</span>
+                    <i id="arrow-sec-excluyentes" class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                </button>
+                <div id="sec-excluyentes" class="p-4 space-y-3">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3 flex gap-2 text-red-800 text-xs mb-2">
+                        <i class="fa-solid fa-triangle-exclamation text-base mt-0.5"></i>
+                        <p><strong>ATENCIÓN:</strong> Cualquier faltante de documentación (Requisitos Excluyentes) es motivo directo de <strong>SUSPENSIÓN</strong> de la unidad.</p>
+                    </div>
+                    
+                    <!-- Contenedor de Tabla Móvil Receptiva -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[500px]">
+                            <thead>
+                                <tr class="border-b border-gray-200 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                                    <th class="py-2 pr-4">Ítem / Documento</th>
+                                    <th class="py-2 px-2 text-center w-36">Presenta</th>
+                                    <th class="py-2 pl-4 w-40">Vencimiento</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-sm">
+                                <!-- Filas Excluyentes Producidas Explícitamente -->
+                                <script>
+                                    const excluyentes = [
+                                        { id: "habilitacion", label: "HABILITACIÓN DE REMIS" },
+                                        { id: "seguro", label: "SEGURO DE REMIS" },
+                                        { id: "vtv", label: "VTV DE REMIS" },
+                                        { id: "registro", label: "REGISTRO CON CATEG D O SUPERIOR" },
+                                        { id: "cedula", label: "CÉDULA AZUL (si corresponde)" },
+                                        { id: "celular", label: "CELULAR Y APP REMISES FUNCIONANDO" },
+                                        { id: "oblea", label: "OBLEA GNC" },
+                                        { id: "matafuego", label: "MATAFUEGO" },
+                                        { id: "aire", label: "AIRE ACONDICIONADO" },
+                                        { id: "calefaccion", label: "CALEFACCIÓN" }
+                                    ];
+                                    excluyentes.forEach(item => {
+                                        document.write(`
+                                            <tr>
+                                                <td class="py-3 pr-4 font-medium text-gray-700 uppercase">${item.label}</td>
+                                                <td class="py-3 px-2 text-center">
+                                                    <div class="inline-flex rounded-lg border border-gray-300 p-0.5 bg-gray-50">
+                                                        <label class="cursor-pointer">
+                                                            <input type="radio" name="excl_${item.id}" value="SI" checked class="peer hidden">
+                                                            <span class="px-3 py-1 rounded-md text-xs font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-green-600 peer-checked:shadow-sm">SI</span>
+                                                        </label>
+                                                        <label class="cursor-pointer">
+                                                            <input type="radio" name="excl_${item.id}" value="NO" class="peer hidden">
+                                                            <span class="px-3 py-1 rounded-md text-xs font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-red-600 peer-checked:shadow-sm">NO</span>
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 pl-4">
+                                                    <input type="date" name="venc_${item.id}" class="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500">
+                                                </td>
+                                            </tr>
+                                        `);
+                                    });
+                                </script>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOQUE 3: ESTADO DEL VEHÍCULO -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <button type="button" onclick="toggleSection('sec-estado')" class="w-full px-5 py-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-bold text-gray-700 border-b border-gray-200">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-wrench text-orange-500"></i> 3. Estado del Vehículo</span>
+                    <i id="arrow-sec-estado" class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                </button>
+                <div id="sec-estado" class="p-4">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[400px]">
+                            <thead>
+                                <tr class="border-b border-gray-200 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                                    <th class="py-2 pr-4">Componente / Revisión</th>
+                                    <th class="py-2 text-center w-56">Calificación</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-sm">
+                                <script>
+                                    const componentes = [
+                                        { id: "chapa", label: "ESTADO GENERAL CHAPA Y PINTURA" },
+                                        { id: "parabrisas", label: "PARABRISAS" },
+                                        { id: "escobillas", label: "ESCOBILLAS" },
+                                        { id: "cinturones", label: "CINTURONES DE SEGURIDAD" },
+                                        { id: "neumaticos_del", label: "NEUMÁTICOS DELANTEROS" },
+                                        { id: "neumaticos_tras", label: "NEUMÁTICOS TRASEROS" },
+                                        { id: "luces_del", label: "LUCES DELANTERAS" },
+                                        { id: "luces_tras", label: "LUCES TRASERAS" },
+                                        { id: "limpieza", label: "LIMPIEZA" },
+                                        { id: "levantacristales", label: "LEVANTACRISTALES" },
+                                        { id: "cerraduras", label: "CERRADURAS DE PUERTAS" }
+                                    ];
+                                    componentes.forEach(item => {
+                                        document.write(`
+                                            <tr>
+                                                <td class="py-3 pr-4 font-medium text-gray-700 uppercase">${item.label}</td>
+                                                <td class="py-3 text-center">
+                                                    <div class="inline-flex rounded-lg border border-gray-300 p-0.5 bg-gray-50 w-full">
+                                                        <label class="flex-1 cursor-pointer">
+                                                            <input type="radio" name="est_${item.id}" value="BUENO" checked class="peer hidden">
+                                                            <span class="py-1 rounded-md text-[11px] font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-blue-600 peer-checked:shadow-sm">B</span>
+                                                        </label>
+                                                        <label class="flex-1 cursor-pointer">
+                                                            <input type="radio" name="est_${item.id}" value="REGULAR" class="peer hidden">
+                                                            <span class="py-1 rounded-md text-[11px] font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-orange-500 peer-checked:shadow-sm">R</span>
+                                                        </label>
+                                                        <label class="flex-1 cursor-pointer">
+                                                            <input type="radio" name="est_${item.id}" value="MALO" class="peer hidden">
+                                                            <span class="py-1 rounded-md text-[11px] font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-red-600 peer-checked:shadow-sm">M</span>
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `);
+                                    });
+                                </script>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOQUE 4: INDUMENTARIA Y CONDUCTOR -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <button type="button" onclick="toggleSection('sec-conductor')" class="w-full px-5 py-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-bold text-gray-700 border-b border-gray-200">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-user-tie text-purple-500"></i> 4. Personal / Chofer</span>
+                    <i id="arrow-sec-conductor" class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                </button>
+                <div id="sec-conductor" class="p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2">
+                        <span class="font-medium text-gray-700 text-sm uppercase">INDUMENTARIA Y PROLIJIDAD DEL CONDUCTOR</span>
+                        <div class="inline-flex rounded-lg border border-gray-300 p-0.5 bg-gray-50 sm:w-56">
+                            <label class="flex-1 text-center cursor-pointer">
+                                <input type="radio" name="cond_prolijidad" value="BUENO" checked class="peer hidden">
+                                <span class="py-1.5 px-3 rounded-md text-xs font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-blue-600 peer-checked:shadow-sm">BUENO</span>
+                            </label>
+                            <label class="flex-1 text-center cursor-pointer">
+                                <input type="radio" name="cond_prolijidad" value="REGULAR" class="peer hidden">
+                                <span class="py-1.5 px-3 rounded-md text-xs font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-orange-500 peer-checked:shadow-sm">REGULAR</span>
+                            </label>
+                            <label class="flex-1 text-center cursor-pointer">
+                                <input type="radio" name="cond_prolijidad" value="MALO" class="peer hidden">
+                                <span class="py-1.5 px-3 rounded-md text-xs font-bold block text-gray-400 peer-checked:bg-white peer-checked:text-red-600 peer-checked:shadow-sm">MALO</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOQUE 5: CIERRE Y OBSERVACIONES -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <button type="button" onclick="toggleSection('sec-cierre')" class="w-full px-5 py-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-bold text-gray-700 border-b border-gray-200">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-signature text-teal-500"></i> 5. Cierre de Inspección</span>
+                    <i id="arrow-sec-cierre" class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                </button>
+                <div id="sec-cierre" class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Inspeccionado Por</label>
+                        <input type="text" name="inspector" placeholder="Nombre del inspector" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Observaciones</label>
+                        <textarea name="observaciones" rows="3" placeholder="Detalles o aclaraciones adicionales..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTONES PRINCIPALES DE ACCIÓN ACCESIBLES -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <button type="button" onclick="clearForm()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-4 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 order-3 sm:order-1">
+                    <i class="fa-solid fa-trash-can"></i> Limpiar Todo
+                </button>
+                <button type="button" onclick="submitForm('Suspendido')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-red-100 transition-colors flex items-center justify-center gap-2 order-1 sm:order-2">
+                    <i class="fa-solid fa-circle-xmark"></i> Marcar Suspendido
+                </button>
+                <button type="button" onclick="submitForm('Aprobado')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-green-100 transition-colors flex items-center justify-center gap-2 order-2 sm:order-3">
+                    <i class="fa-solid fa-circle-check"></i> Marcar Aprobado
+                </button>
+            </div>
+        </form>
+
+        <!-- ========================================== -->
+        <!-- SECCIÓN: APARTADO DE HISTORIAL / NOVEDADES -->
+        <!-- ========================================== -->
+        <div id="historySection" class="hidden space-y-4">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fa-solid fa-database text-blue-500"></i> Registros de la Planilla
+                    </h2>
+                    <button onclick="fetchSheetsData()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1">
+                        <i class="fa-solid fa-rotate"></i> Actualizar
                     </button>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <div class="relative flex-1">
-                        <i class="fa-solid fa-search absolute left-3 top-3.5 text-gray-400 text-xs"></i>
-                        <input type="text" id="filter-search" oninput="applyFilters()" class="w-full rounded-md border border-gray-300 py-2.5 pl-8 pr-3 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Buscar por Patente, Chofer, Inspector...">
-                    </div>
-                    <div class="flex gap-2">
-                        <select id="filter-veredicto" onchange="applyFilters()" class="rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white flex-1 sm:flex-initial">
-                            <option value="TODOS">Todos</option>
-                            <option value="APROBADO">Aprobados</option>
-                            <option value="SUSPENDIDO">Suspendidos</option>
-                        </select>
-                        <select id="filter-tiempo" onchange="applyFilters()" class="rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white flex-1 sm:flex-initial">
-                            <option value="TODOS">Todas las fechas</option>
-                            <option value="HOY">Solo Hoy</option>
-                            <option value="7DIAS">Últimos 7 días</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Lista de Novedades cargadas desde la Base de Datos -->
-            <div class="space-y-3" id="inspectionsListContainer">
-                <div class="text-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200">
-                    <i class="fa-solid fa-spinner animate-spin text-2xl text-blue-500 mb-2"></i>
-                    <p class="text-sm font-medium">Buscando novedades en la base de datos...</p>
+                
+                <div class="overflow-x-auto rounded-lg border border-gray-100">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                                <th class="p-3">Fecha</th>
+                                <th class="p-3">Empresa</th>
+                                <th class="p-3">Dominio (Int)</th>
+                                <th class="p-3">Chofer</th>
+                                <th class="p-3 text-center">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inspections-tbody" class="divide-y divide-gray-100 text-xs">
+                            <tr>
+                                <td colspan="5" class="p-6 text-center text-gray-400">Cargando base de datos remota...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Modal de Copiado de Reporte (Reemplazo del envío directo) -->
-    <div id="shareModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-[60] px-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-300" id="shareModalContent">
-            <div class="p-6 text-center transition-colors duration-300" id="modalHeaderBg">
-                <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-white mb-4 shadow-sm" id="modalIconContainer">
-                    <i class="fa-solid fa-clipboard-check text-2xl" id="modalIcon"></i>
+    <!-- Ventana Flotante Interactiva de Envío / Compartir -->
+    <div id="shareModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs hidden items-center justify-center z-[9999] p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-100 p-6 scale-95 transition-transform">
+            <div class="flex items-center gap-3 mb-2 text-gray-800">
+                <div class="bg-green-100 text-green-600 p-2 rounded-xl">
+                    <i class="fa-solid fa-share-nodes text-lg"></i>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-1" id="modalTitle">Inspección Guardada</h3>
-                <p class="text-white text-sm opacity-90" id="modalSubtitle">Registro subido correctamente</p>
+                <div>
+                    <h3 class="font-bold text-base">¡Registro Guardado con Éxito!</h3>
+                    <p class="text-xs text-gray-500">Los datos se subieron a Google Sheets.</p>
+                </div>
             </div>
-            <div class="p-6 space-y-4 bg-gray-50">
-                <p class="text-sm text-gray-600 text-center font-medium">Copia y comparte el reporte:</p>
-                
-                <!-- Cuadro de texto para copiar el reporte -->
-                <textarea id="reportTextarea" readonly class="w-full h-48 p-3 text-xs text-gray-700 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 resize-none font-mono"></textarea>
-                
-                <!-- Botón de Copiar Inteligente -->
-                <button type="button" id="btnCopy" onclick="copyReportToClipboard()" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none shadow-sm transition-colors">
-                    <i class="fa-regular fa-copy mr-2 text-xl" id="copyIcon"></i> <span id="copyText">Copiar Reporte</span>
+            
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Vista Previa del Informe:</label>
+            <textarea id="shareTextPreview" readonly class="w-full h-56 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-700 focus:outline-none mb-4 resize-none leading-relaxed"></textarea>
+            
+            <div class="flex flex-col gap-2">
+                <button onclick="shareViaWhatsApp()" class="w-full bg-[#25D366] hover:bg-[#20ba56] text-white font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-md shadow-green-100">
+                    <i class="fa-brands fa-whatsapp text-lg"></i> Enviar por WhatsApp
                 </button>
-                
-                <div class="pt-2">
-                    <button type="button" onclick="closeShareModal()" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-100 focus:outline-none transition-colors">
-                        Cerrar y Volver
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="copyToClipboard()" id="btn-copy" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-xs">
+                        <i class="fa-solid fa-copy"></i> Copiar Texto
+                    </button>
+                    <button onclick="closeShareModal()" class="bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-500 font-medium py-2.5 px-4 rounded-xl transition-colors text-xs">
+                        Cerrar Ventana
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Detalles del Historial -->
-    <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-[60] px-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300" id="detailModalContent">
-            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                <h3 class="text-lg font-bold text-gray-800">Detalle de Inspección</h3>
-                <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="p-5 max-h-[70vh] overflow-y-auto space-y-4" id="detailModalBody">
-                <!-- Inyección dinámica -->
-            </div>
-            <div class="p-4 bg-gray-50 border-t border-gray-100 flex gap-2">
-                <button type="button" id="btnCopyDetail" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-copy"></i> Copiar Reporte
-                </button>
-                <button onclick="closeDetailModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors">
-                    Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Confirmación para Eliminar Registro (Evita el uso de alert/confirm) -->
-    <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-[70] px-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs overflow-hidden p-6 text-center transform scale-95 transition-transform duration-300" id="deleteModalContent">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 text-red-600 mb-4">
-                <i class="fa-solid fa-trash-can text-lg"></i>
-            </div>
-            <h3 class="text-lg font-bold text-gray-900 mb-2">¿Eliminar Inspección?</h3>
-            <p class="text-sm text-gray-500 mb-6">Esta acción borrará el registro de la base de datos de manera permanente. No se puede deshacer.</p>
-            <div class="flex gap-3">
-                <button onclick="closeDeleteModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-lg text-sm transition-colors">Cancelar</button>
-                <button id="btnConfirmDelete" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors">Sí, Eliminar</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Elemento flotante para notificaciones rápidas -->
-    <div id="toast">Operación realizada con éxito.</div>
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-900 text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-xl transition-all translate-y-20 opacity-0 pointer-events-none z-[99999]"></div>
 
-<!-- ================================================================= -->
-    <!-- MASTER SCRIPT: INTEGRACIÓN TOTAL, DESPLEGABLES, COMPARTIR Y TABS  -->
-    <!-- ================================================================= -->
-    
-    <!-- Ventana flotante de Compartir (Oculta por defecto) -->
-    <div id="custom-share-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 999999; padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
-        <div style="background: white; padding: 24px; border-radius: 12px; max-width: 460px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); border: 1px solid #e2e8f0;">
-            <h3 style="margin-top: 0; margin-bottom: 10px; color: #1e293b; font-size: 1.3rem; font-weight: 700;">📋 Resumen de Inspección</h3>
-            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 15px; margin-top: 0;">¡Datos registrados en Sheets! Elegí cómo enviar el informe:</p>
-            <textarea id="share-text-preview" style="width: 100%; height: 150px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; resize: none; font-family: monospace; font-size: 0.85rem; margin-bottom: 20px; background: #f8fafc; color: #334155;" readonly></textarea>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <button id="btn-wp-share" style="background: #25D366; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">🟢 Enviar por WhatsApp</button>
-                <button id="btn-mail-share" style="background: #2563eb; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">🔵 Enviar por Correo</button>
-                <button id="btn-copy-share" style="background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">📋 Copiar Texto Completo</button>
-                <button id="btn-close-share" style="background: transparent; color: #94a3b8; border: none; padding: 8px; cursor: pointer; text-decoration: underline;">Cerrar Ventana</button>
-            </div>
-        </div>
-    </div>
-
+    <!-- LOGICA SCRIPT DEL SISTEMA UNIFICADO -->
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzT6lVmRX4kCKWd4dQD_tEXpnHJlugiAQD2s80zFM11Em_BsyNl76ULM8ft8kbc2xsq/exec";
-        let localInspections = [];
-        let textoFinalCompartir = "";
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzT6lVmRX4kCKWd4dQD_tEXpnHJlugiAQD2s80zFM11Em_BsyNl76ULM8ft8kbc2xsq/exec";
+        let compiledWhatsAppText = "";
 
-        // 1. CARGAR DATOS DESDE GOOGLE SHEETS
-        async function loadInspections() {
-            const statusText = document.getElementById('db-status-text');
-            try {
-                const response = await fetch(SCRIPT_URL);
-                const data = await response.json();
-                localInspections = data.sort((a, b) => new Date(b.FECHA || b.timestamp) - new Date(a.FECHA || a.timestamp));
-                updateInspectionsUI();
-                if (statusText) statusText.textContent = "Conectado a Sheets";
-            } catch (error) {
-                console.error("Error al cargar de Sheets:", error);
-                if (statusText) statusText.textContent = "Error de conexión";
+        // Al iniciar la carga estructurada del DOM
+        document.addEventListener('DOMContentLoaded', () => {
+            // Setea el día actual por defecto en el casillero
+            document.getElementById('campo-fecha').value = new Date().toISOString().split('T')[0];
+            fetchSheetsData();
+        });
+
+        // Alternar el colapso de bloques de forma segura por identificador único
+        function toggleSection(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById(`arrow-${id}`);
+            if (el) {
+                el.classList.toggle('hidden');
+                if (arrow) arrow.classList.toggle('rotate-180');
             }
         }
 
-        // 2. RENDERIZAR TABLA DE HISTORIAL
-        function updateInspectionsUI() {
-            const tbody = document.getElementById('inspections-list') || document.getElementById('inspections-tbody') || document.querySelector('tbody');
-            if (!tbody) return;
+        // Navegación nativa entre pestañas
+        function switchTab(target) {
+            const formContainer = document.getElementById('inspectionForm');
+            const historyContainer = document.getElementById('historySection');
+            const tabNueva = document.getElementById('tab-nueva');
+            const tabHistorial = document.getElementById('tab-historial');
 
-            tbody.innerHTML = '';
-            if (localInspections.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">Cargando historial de la planilla...</td></tr>`;
+            if (target === 'nueva') {
+                formContainer.classList.remove('hidden');
+                historyContainer.classList.add('hidden');
+                
+                tabNueva.className = "px-3 py-2 text-sm font-bold text-blue-600 border-b-2 border-blue-600 flex items-center gap-2 transition-all";
+                tabHistorial.className = "px-3 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center gap-2 transition-all";
+            } else {
+                formContainer.classList.add('hidden');
+                historyContainer.classList.remove('hidden');
+                
+                tabNueva.className = "px-3 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center gap-2 transition-all";
+                tabHistorial.className = "px-3 py-2 text-sm font-bold text-blue-600 border-b-2 border-blue-600 flex items-center gap-2 transition-all";
+                fetchSheetsData();
+            }
+        }
+
+        // Vaciar el formulario nativamente
+        function clearForm() {
+            const form = document.getElementById('inspectionForm');
+            form.reset();
+            document.getElementById('campo-fecha').value = new Date().toISOString().split('T')[0];
+            showToast("⚠️ Formulario restablecido por completo");
+        }
+
+        // Leer datos históricos desde Sheets
+        async function fetchSheetsData() {
+            const status = document.getElementById('db-status-text');
+            const tbody = document.getElementById('inspections-tbody');
+            
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL);
+                const data = await response.json();
+                
+                // Ordena descendente por marca temporal
+                data.sort((a, b) => new Date(b.FECHA || b.timestamp) - new Date(a.FECHA || a.timestamp));
+                
+                tbody.innerHTML = "";
+                if(data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">No hay registros cargados.</td></tr>`;
+                    return;
+                }
+
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-100 hover:bg-gray-50 transition-colors";
+                    
+                    const f = (row.FECHA || row.timestamp || '').split('T')[0];
+                    const emp = row.EMPRESA || row.empresa || '-';
+                    const pat = row.PATENTE || row.patente || '-';
+                    const inter = row.INTERNO || row.interno || '-';
+                    const cho = row.CHOFER || row.chofer || '-';
+                    const res = row.RESULTADO || row.resultado_final || 'Aprobado';
+
+                    let badge = "bg-green-50 text-green-700 border border-green-200";
+                    if(res.toLowerCase().includes('susp')) badge = "bg-red-50 text-red-700 border border-red-200";
+
+                    tr.innerHTML = `
+                        <td class="p-3 font-medium text-gray-600">${f}</td>
+                        <td class="p-3 text-gray-700 font-bold uppercase">${emp}</td>
+                        <td class="p-3 text-gray-600 uppercase">${pat} <span class="text-gray-400">(${inter})</span></td>
+                        <td class="p-3 text-gray-500 uppercase">${cho}</td>
+                        <td class="p-3 text-center"><span class="px-2 py-0.5 rounded-md font-bold text-[10px] ${badge}">${res.toUpperCase()}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                if(status) status.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Conectado a Sheets`;
+            } catch (err) {
+                console.error("Error cargando historial:", err);
+                if(status) status.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> Error de sincronización`;
+            }
+        }
+
+        // Enviar inspección y armar reporte
+        async function submitForm(resultadoVeredicto) {
+            const form = document.getElementById('inspectionForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
                 return;
             }
 
-            localInspections.forEach(ins => {
-                const tr = document.createElement('tr');
-                tr.className = "border-b border-gray-200 hover:bg-gray-50";
-                
-                const fecha = ins.FECHA || ins.fecha || ins.timestamp || '-';
-                const empresa = ins.EMPRESA || ins.empresa || '-';
-                const interno = ins.INTERNO || ins.interno || '-';
-                const patente = ins.PATENTE || ins.patente || '-';
-                const chofer = ins.CHOFER || ins.chofer || '-';
-                const resultado = ins.RESULTADO || ins.resultado || ins.resultado_final || 'Aprobado';
-
-                let badgeColor = "bg-gray-100 text-gray-800";
-                if (resultado.toLowerCase().includes('aprob')) badgeColor = "bg-green-100 text-green-800 font-bold";
-                if (resultado.toLowerCase().includes('susp') || resultado.toLowerCase().includes('mal')) badgeColor = "bg-red-100 text-red-800 font-bold";
-
-                tr.innerHTML = `
-                    <td class="px-4 py-3 text-sm">${fecha.toString().split('T')[0]}</td>
-                    <td class="px-4 py-3 text-sm font-medium">${empresa}</td>
-                    <td class="px-4 py-3 text-sm">${patente} (${interno})</td>
-                    <td class="px-4 py-3 text-sm">${chofer}</td>
-                    <td class="px-4 py-3 text-sm"><span class="px-2 py-1 rounded-full text-xs ${badgeColor}">${resultado}</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // 3. ENVIAR FORMULARIO A GOOGLE SHEETS
-        async function submitInspection(veredicto) {
-            const form = document.getElementById('inspectionForm') || document.querySelector('form');
-            if (!form) return;
-
+            const status = document.getElementById('db-status-text');
             const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-            data.resultado_final = veredicto;
-            data.timestamp = new Date().toISOString();
+            
+            // 1. Armar el Texto Formateado para WhatsApp de forma precisa
+            buildWhatsAppText(formData, resultadoVeredicto);
 
-            prepararMensajeCompartir(data, veredicto);
+            // Convertir datos a objeto plano para mandar a la API
+            const payload = Object.fromEntries(formData.entries());
+            payload.resultado_final = resultadoVeredicto;
+            payload.timestamp = new Date().toISOString();
 
-            const statusText = document.getElementById('db-status-text');
-            if (statusText) statusText.textContent = "Guardando...";
+            if (status) status.innerHTML = `<span class="w-2 h-2 rounded-full bg-orange-500 inline-block animate-ping"></span> Subiendo informe...`;
 
             try {
-                await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
-                document.getElementById('custom-share-modal').style.display = 'flex';
-                form.reset();
-                loadInspections();
-            } catch (error) {
-                console.error("Error al guardar:", error);
-                if (statusText) statusText.textContent = "Error al guardar";
-            }
-        }
-
-        // 4. ARMAR RESUMEN FORMATEADO
-        function prepararMensajeCompartir(data, veredicto) {
-            const buscarCampo = (clave) => {
-                for (let k in data) { if (k.toLowerCase().includes(clave.toLowerCase())) return data[k]; }
-                return '-';
-            };
-            const statusEmoji = veredicto.includes('Aprob') ? 'APROBADO ✅' : 'SUSPENDIDO ❌';
-            textoFinalCompartir = `📋 *RESUMEN DE INSPECCIÓN DE FLOTA*\n\n` +
-                                  `• *Resultado:* ${statusEmoji}\n` +
-                                  `• *Vehículo:* ${buscarCampo('marca').toUpperCase()} ${buscarCampo('modelo')}\n` +
-                                  `• *Patente:* ${buscarCampo('patente').toUpperCase()} (Int: ${buscarCampo('interno')})\n` +
-                                  `• *Empresa:* ${buscarCampo('empresa')}\n` +
-                                  `• *Chofer:* ${buscarCampo('chofer')}\n` +
-                                  `• *Inspector:* ${buscarCampo('inspector')}\n` +
-                                  `• *Observaciones:* ${buscarCampo('observaciones') || 'Ninguna'}`;
-            document.getElementById('share-text-preview').value = textoFinalCompartir;
-        }
-
-        // 5. SISTEMA DE DELEGACIÓN GLOBAL DE CLICS (ANTI-FALLOS)
-        document.addEventListener('click', (e) => {
-            const formContainer = document.getElementById('inspectionForm') || document.querySelector('form');
-            let historyContainer = document.getElementById('historySection') || document.getElementById('historial') || document.querySelector('.history-container');
-            
-            if (!historyContainer && formContainer) {
-                let sibling = formContainer.parentNode.firstChild;
-                while (sibling) {
-                    if (sibling !== formContainer && sibling.nodeType === 1 && (sibling.querySelector('table') || sibling.id.includes('histor') || sibling.className.includes('histor'))) {
-                        historyContainer = sibling;
-                        break;
-                    }
-                    sibling = sibling.nextSibling;
-                }
-            }
-
-            // --- DETECTOR PARA SOLAPAS (TABS) ---
-            const tabElement = e.target.closest('button, div, a, li');
-            if (tabElement) {
-                const tabText = tabElement.textContent.trim();
-                
-                if (tabText.includes('Historial / Novedades')) {
-                    e.preventDefault();
-                    if (formContainer) formContainer.style.display = 'none';
-                    if (historyContainer) {
-                        historyContainer.style.display = 'block';
-                        historyContainer.classList.remove('hidden');
-                    }
-                    actualizarEstiloSolapas(tabElement);
-                    loadInspections();
-                    return;
-                }
-                
-                if (tabText.includes('Nueva Inspección')) {
-                    e.preventDefault();
-                    if (formContainer) formContainer.style.display = 'block';
-                    if (historyContainer) historyContainer.style.display = 'none';
-                    actualizarEstiloSolapas(tabElement);
-                    return;
-                }
-            }
-
-            // --- DETECTOR PARA DESPLEGABLES (INCLUYE REQUISITOS EXCLUYENTES) ---
-            const headerElement = e.target.closest('div, button, h2, h3');
-            if (headerElement) {
-                const headText = headerElement.textContent;
-                if ((headText.includes('Datos Generales') || headText.includes('Requisitos Excluyentes') || headText.includes('Estado del Vehículo') || headText.includes('Cierre de Inspección')) && headerElement.children.length < 5) {
-                    const panel = headerElement.nextElementSibling;
-                    if (panel) {
-                        panel.classList.toggle('hidden');
-                        panel.classList.toggle('max-h-0');
-                    }
-                    return;
-                }
-            }
-
-            // --- DETECTOR PARA BOTONES DE ACCIÓN ---
-            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-                const btn = e.target.closest('button');
-                const btnText = btn.textContent.toLowerCase();
-                if (btnText.includes('aprobar')) {
-                    e.preventDefault();
-                    submitInspection('Aprobado');
-                } else if (btnText.includes('suspender')) {
-                    e.preventDefault();
-                    submitInspection('Suspendido');
-                } else if (btnText.includes('limpiar')) {
-                    e.preventDefault();
-                    if (formContainer) formContainer.reset();
-                }
-            }
-        });
-
-        function actualizarEstiloSolapas(solapaActiva) {
-            const contenedorPadre = solapaActiva.parentNode;
-            if (!contenedorPadre) return;
-            
-            const todasLasSolapas = contenedorPadre.querySelectorAll('button, div, a');
-            todasLasSolapas.forEach(tab => {
-                const txt = tab.textContent.trim();
-                if (txt.includes('Nueva Inspección') || txt.includes('Historial / Novedades')) {
-                    if (tab === solapaActiva) {
-                        tab.className = "px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600 flex items-center gap-2";
-                        tab.style.cursor = 'pointer';
-                    } else {
-                        tab.className = "px-4 py-2 font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center gap-2";
-                        tab.style.cursor = 'pointer';
-                    }
-                }
-            });
-        }
-
-        // CONFIGURACIÓN DE LOS BOTONES DE COMPARTIR
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('btn-wp-share').addEventListener('click', () => {
-                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(textoFinalCompartir)}`, '_blank');
-            });
-            document.getElementById('btn-mail-share').addEventListener('click', () => {
-                window.open(`mailto:?subject=Inspección Vehicular&body=${encodeURIComponent(textoFinalCompartir)}`, '_blank');
-            });
-            document.getElementById('btn-copy-share').addEventListener('click', function() {
-                navigator.clipboard.writeText(textoFinalCompartir).then(() => {
-                    this.textContent = "¡Copiado! ✓";
-                    setTimeout(() => { this.textContent = "📋 Copiar Texto Completo"; }, 2000);
+                // Envío asíncrono en segundo plano a la API de Apps Script
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(payload)
                 });
+
+                // Abrir modal de compartir
+                document.getElementById('shareTextPreview').value = compiledWhatsAppText;
+                const modal = document.getElementById('shareModal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                form.reset();
+                document.getElementById('campo-fecha').value = new Date().toISOString().split('T')[0];
+                fetchSheetsData();
+            } catch (error) {
+                console.error("Error al transmitir datos:", error);
+                showToast("❌ Error al guardar en Sheets");
+            }
+        }
+
+        // Motor inteligente y mapeador para reporte de WhatsApp exacto
+        function buildWhatsAppText(formData, veredicto) {
+            const getVal = (name) => (formData.get(name) || '').toString().trim();
+
+            let faltantesDoc = [];
+            let fallasAuto = [];
+
+            // Diccionarios explícitos de etiquetas legibles
+            const dictExcluyentes = {
+                habilitacion: "HABILITACIÓN DE REMIS",
+                seguro: "SEGURO DE REMIS",
+                vtv: "VTV DE REMIS",
+                registro: "REGISTRO CON CATEG D O SUPERIOR",
+                cedula: "CÉDULA AZUL (si corresponde)",
+                celular: "CELULAR Y APP REMISES FUNCIONANDO",
+                oblea: "OBLEA GNC",
+                matafuego: "MATAFUEGO",
+                aire: "AIRE ACONDICIONADO",
+                calefaccion: "CALEFACCIÓN"
+            };
+
+            const dictComponentes = {
+                chapa: "ESTADO GENERAL CHAPA Y PINTURA",
+                parabrisas: "PARABRISAS",
+                escobillas: "ESCOBILLAS",
+                cinturones: "CINTURONES DE SEGURIDAD",
+                neumaticos_del: "NEUMÁTICOS DELANTEROS",
+                neumaticos_tras: "NEUMÁTICOS TRASEROS",
+                luces_del: "LUCES DELANTERAS",
+                luces_tras: "LUCES TRASERAS",
+                limpieza: "LIMPIEZA",
+                levantacristales: "LEVANTACRISTALES",
+                cerraduras: "CERRADURAS DE PUERTAS"
+            };
+
+            // Escaneo de respuestas
+            for (let [key, val] of formData.entries()) {
+                if (key.startsWith('excl_') && val === 'NO') {
+                    let id = key.replace('excl_', '');
+                    if (dictExcluyentes[id]) faltantesDoc.push(dictExcluyentes[id]);
+                }
+                if (key.startsWith('est_') && (val === 'REGULAR' || val === 'MALO')) {
+                    let id = key.replace('est_', '');
+                    if (dictComponentes[id]) fallasAuto.push(`${dictComponentes[id]}: *${val}*`);
+                }
+            }
+
+            // Caso especial de prolijidad del chofer
+            let prolijidad = formData.get('cond_prolijidad');
+            if (prolijidad === 'REGULAR' || prolijidad === 'MALO') {
+                fallasAuto.push(`Prolijidad Conductor: *${prolijidad}*`);
+            }
+
+            const emojiHeader = veredicto.toLowerCase().includes('aprob') ? '✅' : '⛔';
+
+            // Composición final del cuerpo de texto estructurado
+            let txt = `*INSPECCIÓN DE AUTO - ${veredicto.toUpperCase()} ${emojiHeader}*\n\n`;
+            txt += `📅 *Fecha:* ${getVal('fecha')}\n`;
+            txt += `🏢 *Empresa:* ${getVal('empresa')}\n`;
+            txt += `🔢 *Interno:* ${getVal('interno')}\n`;
+            txt += `🚗 *Patente:* ${getVal('patente').toUpperCase()}\n`;
+            txt += `🚘 *Auto:* ${getVal('marca')} ${getVal('modelo')}\n`;
+            txt += `🧑‍✈️ *Chofer:* ${getVal('chofer')}\n`;
+            txt += `📝 *Inspector:* ${getVal('inspector')}\n\n`;
+
+            if (faltantesDoc.length > 0) {
+                txt += `*⚠️ DOCUMENTACIÓN / EXCLUYENTES FALTANTES:*\n`;
+                txt += faltantesDoc.map(item => `- ${item}`).join('\n') + `\n\n`;
+            }
+
+            if (fallasAuto.length > 0) {
+                txt += `*🔧 REPARACIONES / FALLAS ENCONTRADAS:*\n`;
+                txt += fallasAuto.map(item => `- ${item}`).join('\n') + `\n\n`;
+            }
+
+            let obs = getVal('observaciones');
+            if (obs && obs.toLowerCase() !== 'ninguna') {
+                txt += `💬 *Observaciones:* ${obs}\n`;
+            }
+
+            compiledWhatsAppText = txt.trim();
+        }
+
+        // Acciones del cuadro de compartir
+        function shareViaWhatsApp() {
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(compiledWhatsAppText)}`, '_blank');
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(compiledWhatsAppText).then(() => {
+                const btn = document.getElementById('btn-copy');
+                btn.innerHTML = `<i class="fa-solid fa-check"></i> ¡Copiado!`;
+                setTimeout(() => {
+                    btn.innerHTML = `<i class="fa-solid fa-copy"></i> Copiar Texto`;
+                }, 2000);
             });
-            document.getElementById('btn-close-share').addEventListener('click', () => {
-                document.getElementById('custom-share-modal').style.display = 'none';
-            });
-            loadInspections();
-        });
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.replace('flex', 'hidden');
+        }
+
+        // Notificaciones Flotantes Rápidas (Toasts)
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
     </script>
 </body>
 </html>
