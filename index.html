@@ -413,752 +413,104 @@
     <!-- Elemento flotante para notificaciones rápidas -->
     <div id="toast">Operación realizada con éxito.</div>
 
+<!-- ================================================================= -->
+    <!-- INTEGRACIÓN TOTAL CON GOOGLE SHEETS (REEMPLAZO DE FIREBASE)       -->
+    <!-- ================================================================= -->
     <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzT6lVmRX4kCKWd4dQD_tEXpnHJlugiAQD2s80zFM11Em_BsyNl76ULM8ft8kbc2xsq/exec";
-    let localInspections = [];
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzT6lVmRX4kCKWd4dQD_tEXpnHJlugiAQD2s80zFM11Em_BsyNl76ULM8ft8kbc2xsq/exec";
+        let localInspections = [];
 
-    // Cargar datos al iniciar
-    async function loadInspections() {
-        const statusText = document.getElementById('db-status-text');
-        try {
-            const response = await fetch(SCRIPT_URL);
-            const data = await response.json();
-            localInspections = data; 
-            updateInspectionsUI();
-            if (statusText) statusText.textContent = "Conectado a Sheets";
-        } catch (error) {
-            console.error("Error al cargar:", error);
-            if (statusText) statusText.textContent = "Error de conexión";
-        }
-    }
-
-    // Guardar inspección (reemplaza la lógica de Firebase)
-    async function submitInspection(veredicto) {
-        const form = document.getElementById('inspectionForm');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
-        data.resultado_final = veredicto;
-        data.timestamp = new Date().toISOString();
-
-        try {
-            await fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify(data)
-            });
-            showToast("Inspección guardada correctamente.");
-            form.reset();
-            loadInspections(); // Recargar lista
-        } catch (error) {
-            console.error("Error:", error);
-            showToast("Error al guardar.");
-        }
-    }
-
-    // Funcionalidad de filtros (necesaria para el buscador)
-    function applyFilters() {
-        // Lógica de filtrado basada en tu HTML original
-        const search = document.getElementById('filter-search').value.toLowerCase();
-        const veredicto = document.getElementById('filter-veredicto').value;
-        // ... (resto de tu lógica de filtrado)
-        updateInspectionsUI();
-    }
-
-    // Inicialización
-    loadInspections();
-</script>
-
-    <script>
-        const requisitosExcluyentes = [
-            { id: "hab_remis", label: "HABILITACIÓN DE REMIS" },
-            { id: "seg_remis", label: "SEGURO DE REMIS" },
-            { id: "vtv", label: "VTV DE REMIS" },
-            { id: "registro", label: "REGISTRO CON CATEG D O SUPERIOR" },
-            { id: "cedula_azul", label: "CÉDULA AZUL (si corresponde)" },
-            { id: "app_remis", label: "CELULAR Y APP REMISES FUNCIONANDO" },
-            { id: "oblea_gnc", label: "OBLEA GNC" },
-            { id: "matafuego", label: "MATAFUEGO" },
-            { id: "aire", label: "AIRE ACONDICIONADO" },
-            { id: "calefaccion", label: "CALEFACCIÓN" }
-        ];
-
-        const estadoVehiculo = [
-            { id: "chapa", label: "ESTADO GENERAL CHAPA Y PINTURA" },
-            { id: "parabrisas", label: "PARABRISAS" },
-            { id: "escobillas", label: "ESCOBILLAS" },
-            { id: "cinturones", label: "CINTURONES DE SEGURIDAD" },
-            { id: "neu_del", label: "NEUMÁTICOS DELANTEROS" },
-            { id: "neu_tras", label: "NEUMÁTICOS TRASEROS" },
-            { id: "luces_del", label: "LUCES DELANTERAS" },
-            { id: "luces_tras", label: "LUCES TRASERAS" },
-            { id: "limpieza", label: "LIMPIEZA GENERAL" },
-            { id: "levantacristales", label: "LEVANTACRISTALES" },
-            { id: "cerraduras", label: "CERRADURAS DE PUERTAS" }
-        ];
-
-        // Configurar la fecha de hoy
-        function initDate() {
-            const today = new Date();
-            const dateString = today.toISOString().split('T')[0];
-            document.getElementById('fecha').value = dateString;
-            
-            const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
-            document.getElementById('currentDateDisplay').textContent = today.toLocaleDateString('es-AR', options);
-        }
-
-        // Render de Requisitos Excluyentes (Fila de tabla)
-        function renderExcluyentes() {
-            const tbody = document.getElementById('excluyentesBody');
-            let html = '';
-            
-            requisitosExcluyentes.forEach((item, index) => {
-                const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-                html += `
-                    <tr class="${bgClass}">
-                        <td class="px-4 py-3 text-sm font-semibold text-gray-800 align-middle">
-                            ${item.label}
-                        </td>
-                        <td class="px-4 py-3 align-middle text-center">
-                            <div class="flex radio-group radio-sino justify-center">
-                                <input type="radio" id="${item.id}_si" name="${item.id}_estado" value="SI">
-                                <label for="${item.id}_si" class="w-12 h-10">SI</label>
-                                
-                                <input type="radio" id="${item.id}_no" name="${item.id}_estado" value="NO">
-                                <label for="${item.id}_no" class="w-12 h-10">NO</label>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3 align-middle">
-                            <input type="date" name="${item.id}_vto" class="w-full text-xs rounded border border-gray-300 p-1 md:p-2 focus:ring-blue-500 focus:border-blue-500">
-                        </td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
-        }
-
-        // Render del Estado del Vehículo (Chapa, pintura, etc.)
-        function renderEstadoVehiculo() {
-            const ul = document.getElementById('estadoVehiculoList');
-            let html = '';
-
-            estadoVehiculo.forEach((item, index) => {
-                const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-                html += `
-                    <li class="${bgClass} px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div class="text-sm font-semibold text-gray-800 sm:w-1/2">
-                            ${item.label}
-                        </div>
-                        <div class="flex radio-group radio-group-3 radio-estado sm:w-1/2">
-                            <input type="radio" id="${item.id}_bueno" name="${item.id}" value="BUENO">
-                            <label for="${item.id}_bueno" class="flex-1 text-center py-2.5">BUENO</label>
-                            
-                            <input type="radio" id="${item.id}_regular" name="${item.id}" value="REGULAR">
-                            <label for="${item.id}_regular" class="flex-1 text-center py-2.5 border-l-0">REGULAR</label>
-                            
-                            <input type="radio" id="${item.id}_malo" name="${item.id}" value="MALO">
-                            <label for="${item.id}_malo" class="flex-1 text-center py-2.5">MALO</label>
-                        </div>
-                    </li>
-                `;
-            });
-            ul.innerHTML = html;
-        }
-
-        function toggleSection(sectionId) {
-            const section = document.getElementById(sectionId);
-            const icon = document.getElementById(`icon-${sectionId}`);
-            
-            if (section.style.display === 'none') {
-                section.style.display = 'block';
-                icon.classList.add('rotate-180');
-            } else {
-                section.style.display = 'none';
-                icon.classList.remove('rotate-180');
-            }
-        }
-
-        function showToast(message) {
-            const toast = document.getElementById("toast");
-            toast.textContent = message;
-            toast.className = "show";
-            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
-        }
-
-        // Cambiar entre la vista de formulario y el historial
-        function switchTab(tab) {
-            const tabForm = document.getElementById('tab-content-form');
-            const tabHistory = document.getElementById('tab-content-history');
-            const btnForm = document.getElementById('btn-tab-form');
-            const btnHistory = document.getElementById('btn-tab-history');
-            const historyBadge = document.getElementById('history-badge');
-
-            if (tab === 'form') {
-                tabForm.classList.remove('hidden');
-                tabHistory.classList.add('hidden');
-                btnForm.classList.add('active');
-                btnHistory.classList.remove('active');
-            } else {
-                tabForm.classList.add('hidden');
-                tabHistory.classList.remove('hidden');
-                btnForm.classList.remove('active');
-                btnHistory.classList.add('active');
-                historyBadge.classList.add('hidden');
+        // 1. Cargar datos desde Google Sheets
+        async function loadInspections() {
+            const statusText = document.getElementById('db-status-text');
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const data = await response.json();
                 
-                applyFilters();
+                // Ordenar por fecha (más reciente primero)
+                localInspections = data.sort((a, b) => new Date(b.fecha || b.timestamp) - new Date(a.fecha || a.timestamp));
+                
+                // Si existe la función para dibujar la tabla en tu HTML, la ejecuta
+                if (typeof updateInspectionsUI === 'function') {
+                    updateInspectionsUI();
+                }
+                if (statusText) statusText.textContent = "Conectado a Sheets";
+            } catch (error) {
+                console.error("Error al cargar de Sheets:", error);
+                if (statusText) statusText.textContent = "Error de conexión";
             }
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        // 2. Guardar datos en Google Sheets
         async function submitInspection(veredicto) {
-            const form = document.getElementById('inspectionForm');
-            
-            // Validaciones nativas
-            if (!form.reportValidity()) {
-                document.getElementById('datos-generales').style.display = 'block';
-                document.getElementById('icon-datos-generales').classList.add('rotate-180');
-                showToast("Complete los campos de Datos Generales.");
+            const form = document.getElementById('inspectionForm') || document.querySelector('form');
+            if (!form) {
+                console.error("No se encontró el formulario en el HTML.");
                 return;
             }
 
-            const inspectorValue = document.getElementById('inspector_input').value.trim();
-            if (!inspectorValue) {
-                document.getElementById('cierre').style.display = 'block';
-                document.getElementById('icon-cierre').classList.add('rotate-180');
-                showToast("Debe ingresar el nombre del inspector.");
-                return;
-            }
-
-            // Validar que se seleccionó cada punto de la inspección
-            let valid = true;
-            requisitosExcluyentes.forEach(req => {
-                const isSelected = form.querySelector(`input[name="${req.id}_estado"]:checked`);
-                if (!isSelected) valid = false;
-            });
-            estadoVehiculo.forEach(est => {
-                const isSelected = form.querySelector(`input[name="${est.id}"]:checked`);
-                if (!isSelected) valid = false;
-            });
-
-            if (!valid) {
-                showToast("Faltan seleccionar calificaciones en los ítems.");
-                document.getElementById('excluyentes').style.display = 'block';
-                document.getElementById('icon-excluyentes').classList.add('rotate-180');
-                document.getElementById('estado-vehiculo').style.display = 'block';
-                document.getElementById('icon-estado-vehiculo').classList.add('rotate-180');
-                return;
-            }
-            
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
             
-            data.resultado_final = veredicto; 
+            // Agregamos el resultado del botón y la fecha actual
+            data.resultado_final = veredicto;
             data.timestamp = new Date().toISOString();
 
-            localStorage.setItem('fleet_inspector_name', inspectorValue);
-            
-            const savedSuccessfully = await window.saveInspectionToDatabase(data);
-
-            if (savedSuccessfully) {
-                const textReport = generateReportText(data, veredicto);
-                openShareModal(textReport, veredicto);
-            }
-        }
-
-        // Generar texto estructurado para reportes copiados
-        function generateReportText(data, veredicto) {
-            const icon = veredicto === 'APROBADO' ? '✅' : '⛔';
-            const cleanPatente = data.patente.toUpperCase().trim();
-            
-            let text = `*INSPECCIÓN DE AUTO - ${veredicto} ${icon}*\n\n`;
-            text += `📅 *Fecha:* ${data.fecha}\n`;
-            text += `🏢 *Empresa:* ${data.empresa}\n`;
-            text += `🔢 *Interno:* ${data.interno}\n`;
-            text += `🚗 *Patente:* ${cleanPatente}\n`;
-            text += `🚘 *Auto:* ${data.marca} ${data.modelo_ano}\n`;
-            text += `🧑‍✈️ *Chofer:* ${data.chofer}\n`;
-            text += `📝 *Inspector:* ${data.inspector}\n\n`;
-
-            let faltantes = [];
-            requisitosExcluyentes.forEach(req => {
-                const estado = data[`${req.id}_estado`];
-                const vto = data[`${req.id}_vto`];
-                if (estado === 'NO') {
-                    let log = `- ${req.label}`;
-                    if (vto) log += ` (Vence: ${vto})`;
-                    faltantes.push(log);
-                }
-            });
-            
-            if (faltantes.length > 0) {
-                text += `*⚠️ DOCUMENTACIÓN FALTANTE:*\n${faltantes.join('\n')}\n\n`;
-            }
-
-            let fallas = [];
-            estadoVehiculo.forEach(est => {
-                const valor = data[est.id];
-                if (valor === 'MALO' || valor === 'REGULAR') {
-                    fallas.push(`- ${est.label}: *${valor}*`);
-                }
-            });
-            
-            const indumentaria = data['indumentaria'];
-            if (indumentaria === 'MALO' || indumentaria === 'REGULAR') {
-                fallas.push(`- Prolijidad Conductor: *${indumentaria}*`);
-            }
-
-            if (fallas.length > 0) {
-                text += `*🔧 DETALLE DE FALLAS:*\n${fallas.join('\n')}\n\n`;
-            }
-
-            if (data.observaciones && data.observaciones.trim() !== '') {
-                text += `*📌 OBSERVACIONES GENERALES:*\n${data.observaciones.trim()}\n`;
-            }
-
-            return text;
-        }
-
-        function openShareModal(textReport, veredicto) {
-            const modal = document.getElementById('shareModal');
-            const modalContent = document.getElementById('shareModalContent');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalHeaderBg = document.getElementById('modalHeaderBg');
-            const modalIcon = document.getElementById('modalIcon');
-            const modalSubtitle = document.getElementById('modalSubtitle');
-
-            modalTitle.textContent = `Unidad ${veredicto}`;
-            
-            if (veredicto === 'APROBADO') {
-                modalHeaderBg.className = "p-6 text-center bg-emerald-600 text-white";
-                modalIcon.className = "fa-solid fa-check text-3xl text-emerald-600";
-                modalSubtitle.textContent = "Unidad aprobada para circular";
-            } else {
-                modalHeaderBg.className = "p-6 text-center bg-red-600 text-white";
-                modalIcon.className = "fa-solid fa-ban text-3xl text-red-600";
-                modalSubtitle.textContent = "La unidad ha sido inhabilitada";
-            }
-
-            document.getElementById('reportTextarea').value = textReport;
-            
-            // Re-establecer botón de copiar
-            document.getElementById('copyText').textContent = "Copiar Reporte";
-            document.getElementById('copyIcon').className = "fa-regular fa-copy mr-2 text-xl";
-            document.getElementById('btnCopy').className = "w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none shadow-sm transition-colors";
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-            }, 10);
-        }
-
-        function closeShareModal() {
-            const modal = document.getElementById('shareModal');
-            const modalContent = document.getElementById('shareModalContent');
-            
-            modal.classList.add('opacity-0');
-            modalContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-                clearForm();
-            }, 300);
-        }
-
-        // Copiado con fallback nativo compatible
-        function copyReportToClipboard() {
-            const textarea = document.getElementById('reportTextarea');
-            textarea.select();
-            textarea.setSelectionRange(0, 99999);
+            const statusText = document.getElementById('db-status-text');
+            if (statusText) statusText.textContent = "Guardando...";
 
             try {
-                document.execCommand('copy');
-                
-                const btnCopy = document.getElementById('btnCopy');
-                const copyText = document.getElementById('copyText');
-                const copyIcon = document.getElementById('copyIcon');
-                
-                copyText.textContent = "¡Copiado!";
-                copyIcon.className = "fa-solid fa-check mr-2 text-xl";
-                btnCopy.className = "w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-semibold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none shadow-sm transition-colors";
-                
-                window.getSelection().removeAllRanges();
-                showToast("¡Texto copiado al portapapeles!");
-            } catch (err) {
-                showToast("Presione sobre la caja de texto para copiar manualmente.");
-            }
-        }
-
-        function applyFilters() {
-            const search = document.getElementById('filter-search').value.toLowerCase().trim();
-            const veredicto = document.getElementById('filter-veredicto').value;
-            const tiempo = document.getElementById('filter-tiempo').value;
-            
-            const list = window.getLocalInspections();
-            
-            const filtered = list.filter(item => {
-                const matchesSearch = !search || 
-                    (item.patente && item.patente.toLowerCase().includes(search)) ||
-                    (item.chofer && item.chofer.toLowerCase().includes(search)) ||
-                    (item.inspector && item.inspector.toLowerCase().includes(search)) ||
-                    (item.empresa && item.empresa.toLowerCase().includes(search)) ||
-                    (item.interno && item.interno.toString().includes(search));
-
-                const matchesVeredicto = veredicto === 'TODOS' || item.resultado_final === veredicto;
-
-                let matchesTiempo = true;
-                if (tiempo === 'HOY') {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    matchesTiempo = item.fecha === todayStr;
-                } else if (tiempo === '7DIAS') {
-                    const diffTime = Math.abs(new Date() - new Date(item.fecha));
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    matchesTiempo = diffDays <= 7;
-                }
-
-                return matchesSearch && matchesVeredicto && matchesTiempo;
-            });
-
-            renderFilteredInspections(filtered);
-            updateStatistics(filtered);
-        }
-
-        function updateStatistics(filteredList) {
-            const total = filteredList.length;
-            const aprobados = filteredList.filter(i => i.resultado_final === 'APROBADO').length;
-            const suspendidos = filteredList.filter(i => i.resultado_final === 'SUSPENDIDO').length;
-
-            document.getElementById('stats-total').textContent = total;
-            document.getElementById('stats-aprobados').textContent = aprobados;
-            document.getElementById('stats-suspendidos').textContent = suspendidos;
-        }
-
-        function renderFilteredInspections(filteredList) {
-            const container = document.getElementById('inspectionsListContainer');
-            
-            if (filteredList.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-10 bg-white rounded-lg border border-gray-200">
-                        <i class="fa-solid fa-clipboard-question text-3xl text-gray-300 mb-2"></i>
-                        <p class="text-sm font-medium text-gray-500">No hay registros con los filtros seleccionados.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = '';
-            filteredList.forEach(item => {
-                const isAprobado = item.resultado_final === 'APROBADO';
-                const badgeClass = isAprobado 
-                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
-                    : "bg-red-100 text-red-800 border border-red-200";
-                
-                let dateFormatted = item.fecha;
-                try {
-                    const d = new Date(item.fecha + "T00:00:00");
-                    dateFormatted = d.toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit', year: 'numeric'});
-                } catch(e) {}
-
-                let alertBullets = [];
-                requisitosExcluyentes.forEach(req => {
-                    if (item[`${req.id}_estado`] === 'NO') alertBullets.push(req.label);
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(data)
                 });
-
-                const alertHeader = alertBullets.length > 0 
-                    ? `<div class="mt-2 text-xs text-red-600 font-semibold truncate"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Faltan: ${alertBullets.join(', ')}</div>` 
-                    : '';
-
-                html += `
-                    <div class="bg-white rounded-lg border border-gray-200 shadow-sm hover:border-blue-300 transition-all duration-200 overflow-hidden">
-                        <div class="p-4 flex justify-between items-start gap-3">
-                            <div class="flex-1 min-w-0 cursor-pointer" onclick="openDetailModal('${item.id}')">
-                                <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                                    <span class="text-xs font-bold text-gray-500">${dateFormatted}</span>
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${badgeClass}">${item.resultado_final}</span>
-                                    <span class="text-xs text-gray-400 font-medium">Interno ${item.interno || '-'}</span>
-                                </div>
-                                <h4 class="text-lg font-bold text-gray-900 tracking-tight uppercase">${item.patente}</h4>
-                                <p class="text-xs text-gray-500 truncate"><span class="font-semibold text-gray-700">Chofer:</span> ${item.chofer} | <span class="font-semibold text-gray-700">Empresa:</span> ${item.empresa}</p>
-                                ${alertHeader}
-                            </div>
-                            <div class="flex gap-1.5 flex-shrink-0">
-                                <button onclick="openDetailModal('${item.id}')" class="h-9 w-9 flex items-center justify-center bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md text-gray-600 hover:text-blue-600 transition-colors" title="Detalles">
-                                    <i class="fa-solid fa-eye text-sm"></i>
-                                </button>
-                                <button onclick="triggerDeleteConfirm('${item.id}')" class="h-9 w-9 flex items-center justify-center bg-red-50 hover:bg-red-100 border border-red-200 rounded-md text-red-500 hover:text-red-700 transition-colors" title="Eliminar">
-                                    <i class="fa-solid fa-trash-can text-sm"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            container.innerHTML = html;
-        }
-
-        function updateInspectionsUI() {
-            applyFilters();
-        }
-
-        function openDetailModal(id) {
-            const list = window.getLocalInspections();
-            const item = list.find(x => x.id === id);
-            if (!item) return;
-
-            const modal = document.getElementById('detailModal');
-            const modalContent = document.getElementById('detailModalContent');
-            const body = document.getElementById('detailModalBody');
-
-            let dateFormatted = item.fecha;
-            try {
-                const d = new Date(item.fecha + "T00:00:00");
-                dateFormatted = d.toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit', year: 'numeric'});
-            } catch(e) {}
-
-            let docListHtml = '';
-            requisitosExcluyentes.forEach(req => {
-                const presenta = item[`${req.id}_estado`] === 'SI';
-                const color = presenta ? 'text-emerald-600' : 'text-red-600';
-                const icon = presenta ? 'fa-circle-check' : 'fa-circle-xmark';
-                const vto = item[`${req.id}_vto` ] ? `<span class="text-xs text-gray-500 ml-2">(Vto: ${item[`${req.id}_vto`]})</span>` : '';
                 
-                docListHtml += `
-                    <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100">
-                        <span class="font-medium text-gray-700">${req.label}</span>
-                        <div class="flex items-center gap-1">
-                            <span class="font-bold ${color}">${item[`${req.id}_estado`] || '-'}</span>
-                            <i class="fa-solid ${icon} ${color}"></i>
-                            ${vto}
-                        </div>
-                    </div>
-                `;
-            });
-
-            let stateListHtml = '';
-            estadoVehiculo.forEach(est => {
-                const valor = item[est.id] || '-';
-                let colorClass = 'text-gray-500';
-                if (valor === 'BUENO') colorClass = 'text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded';
-                if (valor === 'REGULAR') colorClass = 'text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded';
-                if (valor === 'MALO') colorClass = 'text-red-600 bg-red-50 px-1.5 py-0.5 rounded';
-
-                stateListHtml += `
-                    <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100">
-                        <span class="font-medium text-gray-700">${est.label}</span>
-                        <span class="font-bold text-[10px] ${colorClass}">${valor}</span>
-                    </div>
-                `;
-            });
-
-            const isAprobado = item.resultado_final === 'APROBADO';
-            const statusBadge = isAprobado 
-                ? '<span class="px-2.5 py-1 text-xs font-bold rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">APROBADO</span>'
-                : '<span class="px-2.5 py-1 text-xs font-bold rounded-md bg-red-100 text-red-800 border border-red-200">SUSPENDIDO</span>';
-
-            body.innerHTML = `
-                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                    <div>
-                        <span class="text-xs text-gray-400 font-semibold block">${dateFormatted}</span>
-                        <h4 class="text-xl font-bold text-gray-900 uppercase">${item.patente}</h4>
-                    </div>
-                    <div>${statusBadge}</div>
-                </div>
-
-                <div class="bg-gray-50 p-3 rounded-lg text-xs space-y-1 border border-gray-100">
-                    <p><span class="text-gray-500">Empresa Prestadora:</span> <strong class="text-gray-800">${item.empresa || '-'}</strong></p>
-                    <p><span class="text-gray-500">Interno:</span> <strong class="text-gray-800">${item.interno || '-'}</strong></p>
-                    <p><span class="text-gray-500">Vehículo:</span> <strong class="text-gray-800">${item.marca || '-'} ${item.modelo_ano || ''}</strong></p>
-                    <p><span class="text-gray-500">Chofer:</span> <strong class="text-gray-800">${item.chofer || '-'}</strong></p>
-                    <p><span class="text-gray-500">Inspector:</span> <strong class="text-gray-800">${item.inspector || '-'}</strong></p>
-                </div>
-
-                <div class="space-y-2">
-                    <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider"><i class="fa-solid fa-folder-open text-blue-500"></i> Documentación Excluyente</h5>
-                    <div class="border border-gray-100 rounded-lg p-2 bg-white">${docListHtml}</div>
-                </div>
-
-                <div class="space-y-2">
-                    <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider"><i class="fa-solid fa-car text-blue-500"></i> Estado del Automotor</h5>
-                    <div class="border border-gray-100 rounded-lg p-2 bg-white">${stateListHtml}</div>
-                </div>
-
-                <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs">
-                    <strong class="text-blue-800 block mb-1">Observaciones:</strong>
-                    <p class="text-blue-900">${item.observaciones || 'Sin anotaciones adicionales.'}</p>
-                </div>
-            `;
-
-            const btnCopyDetail = document.getElementById('btnCopyDetail');
-            btnCopyDetail.onclick = function() {
-                const textReport = generateReportText(item, item.resultado_final);
-                navigator.clipboard.writeText(textReport).then(() => {
-                    showToast("¡Reporte copiado!");
-                }).catch(() => {
-                    const tempText = document.createElement("textarea");
-                    tempText.value = textReport;
-                    document.body.appendChild(tempText);
-                    tempText.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(tempText);
-                    showToast("¡Reporte copiado!");
-                });
-            };
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-            }, 10);
-        }
-
-        function closeDetailModal() {
-            const modal = document.getElementById('detailModal');
-            const modalContent = document.getElementById('detailModalContent');
-            modal.classList.add('opacity-0');
-            modalContent.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }, 300);
-        }
-
-        let itemToDeleteId = null;
-
-        function triggerDeleteConfirm(id) {
-            itemToDeleteId = id;
-            const modal = document.getElementById('deleteModal');
-            const modalContent = document.getElementById('deleteModalContent');
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-            }, 10);
-
-            document.getElementById('btnConfirmDelete').onclick = async function() {
-                if (itemToDeleteId) {
-                    await window.deleteInspectionFromDatabase(itemToDeleteId);
-                    closeDeleteModal();
+                // Alerta visual de éxito
+                if (typeof showToast === 'function') {
+                    showToast(`Inspección guardada como: ${veredicto}`);
+                } else {
+                    alert(`Inspección guardada correctamente como: ${veredicto}`);
                 }
-            };
-        }
-
-        function closeDeleteModal() {
-            const modal = document.getElementById('deleteModal');
-            const modalContent = document.getElementById('deleteModalContent');
-            modal.classList.add('opacity-0');
-            modalContent.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-                itemToDeleteId = null;
-            }, 300);
-        }
-
-        function clearForm() {
-            const form = document.getElementById('inspectionForm');
-            form.reset();
-            
-            initDate();
-            
-            const prevInspector = localStorage.getItem('fleet_inspector_name');
-            if (prevInspector) {
-                document.getElementById('inspector_input').value = prevInspector;
+                
+                form.reset();
+                loadInspections(); // Recargar la lista automáticamente
+            } catch (error) {
+                console.error("Error al guardar en Sheets:", error);
+                if (statusText) statusText.textContent = "Error al guardar";
             }
-
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            showToast("Planilla en blanco.");
         }
 
-        function exportToExcel() {
-            const list = window.getLocalInspections();
-            if (list.length === 0) {
-                showToast("No hay registros para exportar.");
-                return;
-            }
-
-            // Cabeceras del Excel
-            const headers = [
-                "Fecha", "Resultado Final", "Patente", "Nro Interno", "Empresa Prestadora", "Marca y Modelo", "Chofer", "Inspector a cargo",
-                "Indumentaria Chofer", "Hab. Remis", "Vto Hab.", "Seguro Remis", "Vto Seguro", "VTV", "Vto VTV", "Registro Conductor", "Vto Registro", 
-                "Cedula Azul", "Vto Cedula", "App Remis", "Oblea GNC", "Vto GNC", "Matafuego", "Vto Matafuego", "Aire Acondicionado", "Vto Aire", 
-                "Calefaccion", "Vto Calef.", "Chapa y Pintura", "Parabrisas", "Escobillas", "Cinturones", "Neu. Delanteros", "Neu. Traseros", 
-                "Luces Del.", "Luces Tras.", "Limpieza", "Levantacristales", "Cerraduras", "Observaciones Generales"
-            ];
-
-            const rows = list.map(item => [
-                item.fecha || "",
-                item.resultado_final || "",
-                (item.patente || "").toUpperCase(),
-                item.interno || "",
-                item.empresa || "",
-                `${item.marca || ""} ${item.modelo_ano || ""}`.trim(),
-                item.chofer || "",
-                item.inspector || "",
-                item.indumentaria || "",
-                item.hab_remis_estado || "", item.hab_remis_vto || "",
-                item.seg_remis_estado || "", item.seg_remis_vto || "",
-                item.vtv_estado || "", item.vtv_vto || "",
-                item.registro_estado || "", item.registro_vto || "",
-                item.cedula_azul_estado || "", item.cedula_azul_vto || "",
-                item.app_remis_estado || "",
-                item.oblea_gnc_estado || "", item.oblea_gnc_vto || "",
-                item.matafuego_estado || "", item.matafuego_vto || "",
-                item.aire_estado || "", item.aire_vto || "",
-                item.calefaccion_estado || "", item.calefaccion_vto || "",
-                item.chapa || "",
-                item.parabrisas || "",
-                item.escobillas || "",
-                item.cinturones || "",
-                item.neu_del || "",
-                item.neu_tras || "",
-                item.luces_del || "",
-                item.luces_tras || "",
-                item.limpieza || "",
-                item.levantacristales || "",
-                item.cerraduras || "",
-                (item.observaciones || "").replace(/"/g, '""').replace(/\n/g, " ")
-            ]);
-
-            // Formateado nativo CSV en español (Punto y coma ";" + UTF-8 BOM)
-            let csvContent = "\uFEFF"; 
-            csvContent += headers.map(h => `"${h}"`).join(";") + "\r\n";
-
-            rows.forEach(row => {
-                csvContent += row.map(val => `"${val}"`).join(";") + "\r\n";
+        // 3. Conexión automática de botones y arranque de la App
+        document.addEventListener('DOMContentLoaded', () => {
+            // Buscamos todos los botones para asignarles su función según el texto que tienen escrito
+            const botones = document.querySelectorAll('button');
+            
+            botones.forEach(boton => {
+                const texto = boton.textContent.toLowerCase();
+                
+                if (texto.includes('aprobar')) {
+                    boton.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        submitInspection('Aprobado');
+                    });
+                } else if (texto.includes('suspender')) {
+                    boton.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        submitInspection('Suspendido');
+                    });
+                } else if (texto.includes('limpiar')) {
+                    boton.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const form = document.getElementById('inspectionForm') || document.querySelector('form');
+                        if (form) form.reset();
+                    });
+                }
             });
 
-            // Disparar descarga del archivo CSV
-            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Planilla_Inspecciones_${new Date().toISOString().split('T')[0]}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            showToast("¡Planilla descargada con éxito!");
-        }
-
-        window.onload = function() {
-            initDate();
-            renderExcluyentes();
-            renderEstadoVehiculo();
-            
-            // Colapsar el listado de estado en móviles para comodidad
-            toggleSection('estado-vehiculo');
-            
-            const prevInspector = localStorage.getItem('fleet_inspector_name');
-            if (prevInspector) {
-                document.getElementById('inspector_input').value = prevInspector;
-            }
-        };
+            // Carga inicial de datos al abrir la página
+            loadInspections();
+        });
     </script>
 </body>
-</html>
+</html>    
