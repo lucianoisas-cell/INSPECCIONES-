@@ -414,26 +414,37 @@
     <div id="toast">Operación realizada con éxito.</div>
 
 <!-- ================================================================= -->
-    <!-- INTEGRACIÓN TOTAL CON GOOGLE SHEETS (REEMPLAZO DE FIREBASE)       -->
+    <!-- MASTER SCRIPT: INTEGRACIÓN TOTAL, DESPLEGABLES, COMPARTIR Y TABS  -->
     <!-- ================================================================= -->
+    
+    <!-- Ventana flotante de Compartir (Oculta por defecto) -->
+    <div id="custom-share-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 999999; padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
+        <div style="background: white; padding: 24px; border-radius: 12px; max-width: 460px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); border: 1px solid #e2e8f0;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; color: #1e293b; font-size: 1.3rem; font-weight: 700;">📋 Resumen de Inspección</h3>
+            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 15px; margin-top: 0;">¡Datos registrados en Sheets! Elegí cómo enviar el informe:</p>
+            <textarea id="share-text-preview" style="width: 100%; height: 150px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; resize: none; font-family: monospace; font-size: 0.85rem; margin-bottom: 20px; background: #f8fafc; color: #334155;" readonly></textarea>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="btn-wp-share" style="background: #25D366; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">🟢 Enviar por WhatsApp</button>
+                <button id="btn-mail-share" style="background: #2563eb; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">🔵 Enviar por Correo</button>
+                <button id="btn-copy-share" style="background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">📋 Copiar Texto Completo</button>
+                <button id="btn-close-share" style="background: transparent; color: #94a3b8; border: none; padding: 8px; cursor: pointer; text-decoration: underline;">Cerrar Ventana</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzT6lVmRX4kCKWd4dQD_tEXpnHJlugiAQD2s80zFM11Em_BsyNl76ULM8ft8kbc2xsq/exec";
         let localInspections = [];
+        let textoFinalCompartir = "";
 
-        // 1. Cargar datos desde Google Sheets
+        // 1. CARGAR DATOS DESDE GOOGLE SHEETS
         async function loadInspections() {
             const statusText = document.getElementById('db-status-text');
             try {
                 const response = await fetch(SCRIPT_URL);
                 const data = await response.json();
-                
-                // Ordenar por fecha (más reciente primero)
-                localInspections = data.sort((a, b) => new Date(b.fecha || b.timestamp) - new Date(a.fecha || a.timestamp));
-                
-                // Si existe la función para dibujar la tabla en tu HTML, la ejecuta
-                if (typeof updateInspectionsUI === 'function') {
-                    updateInspectionsUI();
-                }
+                localInspections = data.sort((a, b) => new Date(b.FECHA || b.timestamp) - new Date(a.FECHA || a.timestamp));
+                updateInspectionsUI();
                 if (statusText) statusText.textContent = "Conectado a Sheets";
             } catch (error) {
                 console.error("Error al cargar de Sheets:", error);
@@ -441,76 +452,202 @@
             }
         }
 
-        // 2. Guardar datos en Google Sheets
-        async function submitInspection(veredicto) {
-            const form = document.getElementById('inspectionForm') || document.querySelector('form');
-            if (!form) {
-                console.error("No se encontró el formulario en el HTML.");
+        // 2. RENDERIZAR TABLA DE HISTORIAL
+        function updateInspectionsUI() {
+            const tbody = document.getElementById('inspections-list') || document.getElementById('inspections-tbody') || document.querySelector('tbody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+            if (localInspections.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">Cargando historial de la planilla...</td></tr>`;
                 return;
             }
 
+            localInspections.forEach(ins => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-200 hover:bg-gray-50";
+                
+                const fecha = ins.FECHA || ins.fecha || ins.timestamp || '-';
+                const empresa = ins.EMPRESA || ins.empresa || '-';
+                const interno = ins.INTERNO || ins.interno || '-';
+                const patente = ins.PATENTE || ins.patente || '-';
+                const chofer = ins.CHOFER || ins.chofer || '-';
+                const resultado = ins.RESULTADO || ins.resultado || ins.resultado_final || 'Aprobado';
+
+                let badgeColor = "bg-gray-100 text-gray-800";
+                if (resultado.toLowerCase().includes('aprob')) badgeColor = "bg-green-100 text-green-800 font-bold";
+                if (resultado.toLowerCase().includes('susp') || resultado.toLowerCase().includes('mal')) badgeColor = "bg-red-100 text-red-800 font-bold";
+
+                tr.innerHTML = `
+                    <td class="px-4 py-3 text-sm">${fecha.toString().split('T')[0]}</td>
+                    <td class="px-4 py-3 text-sm font-medium">${empresa}</td>
+                    <td class="px-4 py-3 text-sm">${patente} (${interno})</td>
+                    <td class="px-4 py-3 text-sm">${chofer}</td>
+                    <td class="px-4 py-3 text-sm"><span class="px-2 py-1 rounded-full text-xs ${badgeColor}">${resultado}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 3. ENVIAR FORMULARIO A GOOGLE SHEETS
+        async function submitInspection(veredicto) {
+            const form = document.getElementById('inspectionForm') || document.querySelector('form');
+            if (!form) return;
+
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
-            
-            // Agregamos el resultado del botón y la fecha actual
             data.resultado_final = veredicto;
             data.timestamp = new Date().toISOString();
+
+            prepararMensajeCompartir(data, veredicto);
 
             const statusText = document.getElementById('db-status-text');
             if (statusText) statusText.textContent = "Guardando...";
 
             try {
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify(data)
-                });
-                
-                // Alerta visual de éxito
-                if (typeof showToast === 'function') {
-                    showToast(`Inspección guardada como: ${veredicto}`);
-                } else {
-                    alert(`Inspección guardada correctamente como: ${veredicto}`);
-                }
-                
+                await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
+                document.getElementById('custom-share-modal').style.display = 'flex';
                 form.reset();
-                loadInspections(); // Recargar la lista automáticamente
+                loadInspections();
             } catch (error) {
-                console.error("Error al guardar en Sheets:", error);
+                console.error("Error al guardar:", error);
                 if (statusText) statusText.textContent = "Error al guardar";
             }
         }
 
-        // 3. Conexión automática de botones y arranque de la App
-        document.addEventListener('DOMContentLoaded', () => {
-            // Buscamos todos los botones para asignarles su función según el texto que tienen escrito
-            const botones = document.querySelectorAll('button');
+        // 4. ARMAR RESUMEN FORMATEADO
+        function prepararMensajeCompartir(data, veredicto) {
+            const buscarCampo = (clave) => {
+                for (let k in data) { if (k.toLowerCase().includes(clave.toLowerCase())) return data[k]; }
+                return '-';
+            };
+            const statusEmoji = veredicto.includes('Aprob') ? 'APROBADO ✅' : 'SUSPENDIDO ❌';
+            textoFinalCompartir = `📋 *RESUMEN DE INSPECCIÓN DE FLOTA*\n\n` +
+                                  `• *Resultado:* ${statusEmoji}\n` +
+                                  `• *Vehículo:* ${buscarCampo('marca').toUpperCase()} ${buscarCampo('modelo')}\n` +
+                                  `• *Patente:* ${buscarCampo('patente').toUpperCase()} (Int: ${buscarCampo('interno')})\n` +
+                                  `• *Empresa:* ${buscarCampo('empresa')}\n` +
+                                  `• *Chofer:* ${buscarCampo('chofer')}\n` +
+                                  `• *Inspector:* ${buscarCampo('inspector')}\n` +
+                                  `• *Observaciones:* ${buscarCampo('observaciones') || 'Ninguna'}`;
+            document.getElementById('share-text-preview').value = textoFinalCompartir;
+        }
+
+        // 5. SISTEMA DE DELEGACIÓN GLOBAL DE CLICS (ANTI-FALLOS)
+        document.addEventListener('click', (e) => {
+            // --- ENCONTRAR CONTENEDORES DE LA APP ---
+            const formContainer = document.getElementById('inspectionForm') || document.querySelector('form');
+            let historyContainer = document.getElementById('historySection') || document.getElementById('historial') || document.querySelector('.history-container');
             
-            botones.forEach(boton => {
-                const texto = boton.textContent.toLowerCase();
+            if (!historyContainer && formContainer) {
+                let sibling = formContainer.parentNode.firstChild;
+                while (sibling) {
+                    if (sibling !== formContainer && sibling.nodeType === 1 && (sibling.querySelector('table') || sibling.id.includes('histor') || sibling.className.includes('histor'))) {
+                        historyContainer = sibling;
+                        break;
+                    }
+                    sibling = sibling.nextSibling;
+                }
+            }
+
+            // --- DETECTOR ULTRA-RESILIENTE PARA SOLAPAS (TABS) ---
+            const tabElement = e.target.closest('button, div, a, li');
+            if (tabElement) {
+                const tabText = tabElement.textContent.trim();
                 
-                if (texto.includes('aprobar')) {
-                    boton.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        submitInspection('Aprobado');
-                    });
-                } else if (texto.includes('suspender')) {
-                    boton.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        submitInspection('Suspendido');
-                    });
-                } else if (texto.includes('limpiar')) {
-                    boton.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        const form = document.getElementById('inspectionForm') || document.querySelector('form');
-                        if (form) form.reset();
-                    });
+                if (tabText.includes('Historial / Novedades')) {
+                    e.preventDefault();
+                    if (formContainer) formContainer.style.display = 'none';
+                    if (historyContainer) {
+                        historyContainer.style.display = 'block';
+                        historyContainer.classList.remove('hidden');
+                    }
+                    // Intercambio de estilos visuales de la barra azul
+                    actualizarEstiloSolapas(tabElement);
+                    loadInspections();
+                    return;
+                }
+                
+                if (tabText.includes('Nueva Inspección')) {
+                    e.preventDefault();
+                    if (formContainer) formContainer.style.display = 'block';
+                    if (historyContainer) historyContainer.style.display = 'none';
+                    actualizarEstiloSolapas(tabElement);
+                    return;
+                }
+            }
+
+            // --- DETECTOR PARA DESPLEGABLES ---
+            const headerElement = e.target.closest('div, button, h2, h3');
+            if (headerElement) {
+                const headText = headerElement.textContent;
+                if ((headText.includes('Datos Generales') || headText.includes('Estado del Vehículo') || headText.includes('Cierre de Inspección')) && headerElement.children.length < 5) {
+                    const panel = headerElement.nextElementSibling;
+                    if (panel) {
+                        panel.classList.toggle('hidden');
+                        panel.classList.toggle('max-h-0');
+                    }
+                    return;
+                }
+            }
+
+            // --- DETECTOR PARA BOTONES DE ACCIÓN ---
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                const btn = e.target.closest('button');
+                const btnText = btn.textContent.toLowerCase();
+                if (btnText.includes('aprobar')) {
+                    e.preventDefault();
+                    submitInspection('Aprobado');
+                } else if (btnText.includes('suspender')) {
+                    e.preventDefault();
+                    submitInspection('Permanente');
+                } else if (btnText.includes('limpiar')) {
+                    e.preventDefault();
+                    if (formContainer) formContainer.reset();
+                }
+            }
+        });
+
+        // FUNCIÓN AUXILIAR PARA MOVER LA LÍNEA AZUL DE LA SOLAPA ACTIVADA
+        function actualizarEstiloSolapas(solapaActiva) {
+            const contenedorPadre = solapaActiva.parentNode;
+            if (!contenedorPadre) return;
+            
+            const todasLasSolapas = contenedorPadre.querySelectorAll('button, div, a');
+            todasLasSolapas.forEach(tab => {
+                const txt = tab.textContent.trim();
+                if (txt.includes('Nueva Inspección') || txt.includes('Historial / Novedades')) {
+                    if (tab === solapaActiva) {
+                        tab.className = "px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600 flex items-center gap-2";
+                        tab.style.cursor = 'pointer';
+                    } else {
+                        tab.className = "px-4 py-2 font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center gap-2";
+                        tab.style.cursor = 'pointer';
+                    }
                 }
             });
+        }
 
-            // Carga inicial de datos al abrir la página
+        // CONFIGURACIÓN DE LOS BOTONES DE COMPARTIR
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('btn-wp-share').addEventListener('click', () => {
+                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(textoFinalCompartir)}`, '_blank');
+            });
+            document.getElementById('btn-mail-share').addEventListener('click', () => {
+                window.open(`mailto:?subject=Inspección Vehicular&body=${encodeURIComponent(textoFinalCompartir)}`, '_blank');
+            });
+            document.getElementById('btn-copy-share').addEventListener('click', function() {
+                navigator.clipboard.writeText(textoFinalCompartir).then(() => {
+                    this.textContent = "¡Copiado! ✓";
+                    setTimeout(() => { this.textContent = "📋 Copiar Texto Completo"; }, 2000);
+                });
+            });
+            document.getElementById('btn-close-share').addEventListener('click', () => {
+                document.getElementById('custom-share-modal').style.display = 'none';
+            });
             loadInspections();
         });
     </script>
 </body>
-</html>    
+</html>
+
