@@ -535,7 +535,6 @@
 
         // 5. SISTEMA DE DELEGACIÓN GLOBAL DE CLICS (ANTI-FALLOS)
         document.addEventListener('click', (e) => {
-            // --- ENCONTRAR CONTENEDORES DE LA APP ---
             const formContainer = document.getElementById('inspectionForm') || document.querySelector('form');
             let historyContainer = document.getElementById('historySection') || document.getElementById('historial') || document.querySelector('.history-container');
             
@@ -550,7 +549,7 @@
                 }
             }
 
-            // --- DETECTOR ULTRA-RESILIENTE PARA SOLAPAS (TABS) ---
+            // --- DETECTOR PARA SOLAPAS (TABS) ---
             const tabElement = e.target.closest('button, div, a, li');
             if (tabElement) {
                 const tabText = tabElement.textContent.trim();
@@ -562,7 +561,6 @@
                         historyContainer.style.display = 'block';
                         historyContainer.classList.remove('hidden');
                     }
-                    // Intercambio de estilos visuales de la barra azul
                     actualizarEstiloSolapas(tabElement);
                     loadInspections();
                     return;
@@ -577,11 +575,11 @@
                 }
             }
 
-            // --- DETECTOR PARA DESPLEGABLES ---
+            // --- DETECTOR PARA DESPLEGABLES (INCLUYE REQUISITOS EXCLUYENTES) ---
             const headerElement = e.target.closest('div, button, h2, h3');
             if (headerElement) {
                 const headText = headerElement.textContent;
-                if ((headText.includes('Datos Generales') || headText.includes('Estado del Vehículo') || headText.includes('Cierre de Inspección')) && headerElement.children.length < 5) {
+                if ((headText.includes('Datos Generales') || headText.includes('Requisitos Excluyentes') || headText.includes('Estado del Vehículo') || headText.includes('Cierre de Inspección')) && headerElement.children.length < 5) {
                     const panel = headerElement.nextElementSibling;
                     if (panel) {
                         panel.classList.toggle('hidden');
@@ -600,7 +598,7 @@
                     submitInspection('Aprobado');
                 } else if (btnText.includes('suspender')) {
                     e.preventDefault();
-                    submitInspection('Permanente');
+                    submitInspection('Suspendido');
                 } else if (btnText.includes('limpiar')) {
                     e.preventDefault();
                     if (formContainer) formContainer.reset();
@@ -608,7 +606,6 @@
             }
         });
 
-        // FUNCIÓN AUXILIAR PARA MOVER LA LÍNEA AZUL DE LA SOLAPA ACTIVADA
         function actualizarEstiloSolapas(solapaActiva) {
             const contenedorPadre = solapaActiva.parentNode;
             if (!contenedorPadre) return;
@@ -650,4 +647,3 @@
     </script>
 </body>
 </html>
-
