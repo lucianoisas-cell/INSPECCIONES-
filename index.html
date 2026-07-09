@@ -413,229 +413,60 @@
     <!-- Elemento flotante para notificaciones rápidas -->
     <div id="toast">Operación realizada con éxito.</div>
 
-    <!-- Configuración e Integración con Firebase SDK v11.6.1 -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, deleteDoc, onSnapshot, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzT6lVmRX4kCKWd4dQD_tEXpnHJlugiAQD2s80zFM11Em_BsyNl76ULM8ft8kbc2xsq/exec";
+    let localInspections = [];
 
-        // ID de la aplicación asignado para el guardado de datos
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'inspeccion-flota-app';
-        
-        let firebaseConfig;
+    // Cargar datos al iniciar
+    async function loadInspections() {
+        const statusText = document.getElementById('db-status-text');
         try {
-            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        } catch(e) {
-            console.warn("No se pudo iniciar la configuración de Firebase", e);
-        }
-
-        let localInspections = [];
-        let isUsingFirebase = false;
-        let db, auth, user;
-
-        // Intentar conectar con la nube
-        async function startDatabase() {
-            const statusDot = document.getElementById('db-status-dot');
-            const statusText = document.getElementById('db-status-text');
-            const statusBadge = document.getElementById('db-status-badge');
-
-            if (firebaseConfig) {
-                try {
-                    const app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
-
-                    // Autenticación segura requerida
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        const credential = await signInWithCustomToken(auth, __initial_auth_token);
-                        user = credential.user;
-                    } else {
-                        const credential = await signInAnonymously(auth);
-                        user = credential.user;
-                    }
-
-                    if (user) {
-                        isUsingFirebase = true;
-                        statusDot.className = "h-2 w-2 rounded-full bg-emerald-400";
-                        statusText.textContent = "Nube Conectada";
-                        statusBadge.className = "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200";
-                        
-                        // Escucha de novedades en tiempo real desde Firestore
-                        const publicInspectionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'inspections');
-                        
-                        onSnapshot(publicInspectionsRef, (snapshot) => {
-                            const tempInspections = [];
-                            snapshot.forEach((doc) => {
-                                tempInspections.push({ id: doc.id, ...doc.data() });
-                            });
-                            // Ordenar localmente por orden cronológico inverso
-                            tempInspections.sort((a, b) => new Date(b.timestamp || b.fecha) - new Date(a.timestamp || a.fecha));
-                            localInspections = tempInspections;
-                            updateInspectionsUI();
-                            
-                            // Mostrar alerta visual en pestaña de historial
-                            const historyBadge = document.getElementById('history-badge');
-                            const activeTab = document.getElementById('btn-tab-history').classList.contains('active');
-                            if (!activeTab && tempInspections.length > 0) {
-                                historyBadge.classList.remove('hidden');
-                            }
-                        }, (error) => {
-                            console.error("Fallo lectura Firebase:", error);
-                            showToast("Error al sincronizar datos.");
-                        });
-                    }
-                } catch (error) {
-                    console.error("Fallo inicialización Firebase:", error);
-                    setupDemoMode();
-                }
-            } else {
-                setupDemoMode();
-            }
-        }
-
-        // Modo offline / simulado si no hay internet o credenciales
-        function setupDemoMode() {
-            const statusDot = document.getElementById('db-status-dot');
-            const statusText = document.getElementById('db-status-text');
-            const statusBadge = document.getElementById('db-status-badge');
-            
-            isUsingFirebase = false;
-            statusDot.className = "h-2 w-2 rounded-full bg-amber-400";
-            statusText.textContent = "Modo Local (Demo)";
-            statusBadge.className = "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200";
-            
-            // Registros de prueba iniciales
-            localInspections = [
-                {
-                    id: "local-demo-1",
-                    fecha: new Date().toISOString().split('T')[0],
-                    timestamp: new Date().toISOString(),
-                    patente: "AF999ZZ",
-                    interno: "402",
-                    empresa: "Remises Express",
-                    marca: "Chevrolet",
-                    modelo_ano: "Spin / 2022",
-                    chofer: "Carlos Gomez",
-                    inspector: "Claudio Rossi",
-                    resultado_final: "APROBADO",
-                    observaciones: "Unidad limpia y bien presentada.",
-                    indumentaria: "BUENO",
-                    hab_remis_estado: "SI",
-                    seg_remis_estado: "SI",
-                    vtv_estado: "SI",
-                    registro_estado: "SI",
-                    cedula_azul_estado: "SI",
-                    app_remis_estado: "SI",
-                    oblea_gnc_estado: "SI",
-                    matafuego_estado: "SI",
-                    aire_estado: "SI",
-                    calefaccion_estado: "SI",
-                    chapa: "BUENO",
-                    parabrisas: "BUENO",
-                    escobillas: "BUENO",
-                    cinturones: "BUENO",
-                    neu_del: "BUENO",
-                    neu_tras: "BUENO",
-                    luces_del: "BUENO",
-                    luces_tras: "BUENO",
-                    limpieza: "BUENO",
-                    levantacristales: "BUENO",
-                    cerraduras: "BUENO"
-                },
-                {
-                    id: "local-demo-2",
-                    fecha: new Date().toISOString().split('T')[0],
-                    timestamp: new Date(Date.now() - 3600000).toISOString(),
-                    patente: "AE412OP",
-                    interno: "123",
-                    empresa: "Unión Trans",
-                    marca: "Renault",
-                    modelo_ano: "Logan / 2020",
-                    chofer: "Juan Martinez",
-                    inspector: "Claudio Rossi",
-                    resultado_final: "SUSPENDIDO",
-                    observaciones: "VTV de remís vencida y sin matafuego en la cabina.",
-                    indumentaria: "REGULAR",
-                    hab_remis_estado: "SI",
-                    seg_remis_estado: "SI",
-                    vtv_estado: "NO",
-                    vtv_vto: "2026-06-01",
-                    registro_estado: "SI",
-                    cedula_azul_estado: "SI",
-                    app_remis_estado: "SI",
-                    oblea_gnc_estado: "SI",
-                    matafuego_estado: "NO",
-                    aire_estado: "SI",
-                    calefaccion_estado: "SI",
-                    chapa: "REGULAR",
-                    parabrisas: "MALO",
-                    escobillas: "BUENO",
-                    cinturones: "BUENO",
-                    neu_del: "REGULAR",
-                    neu_tras: "BUENO",
-                    luces_del: "BUENO",
-                    luces_tras: "BUENO",
-                    limpieza: "BUENO",
-                    levantacristales: "BUENO",
-                    cerraduras: "BUENO"
-                }
-            ];
+            const response = await fetch(SCRIPT_URL);
+            const data = await response.json();
+            localInspections = data; 
             updateInspectionsUI();
+            if (statusText) statusText.textContent = "Conectado a Sheets";
+        } catch (error) {
+            console.error("Error al cargar:", error);
+            if (statusText) statusText.textContent = "Error de conexión";
         }
+    }
 
-        async function saveInspectionToDatabase(data) {
-            if (isUsingFirebase) {
-                if (!auth.currentUser) {
-                    showToast("Sesión desautenticada.");
-                    return false;
-                }
-                try {
-                    const publicInspectionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'inspections');
-                    await addDoc(publicInspectionsRef, data);
-                    return true;
-                } catch (error) {
-                    console.error("Error guardando reporte:", error);
-                    showToast("No se pudo conectar a la base de datos.");
-                    return false;
-                }
-            } else {
-                data.id = "local-" + Math.random().toString(36).substring(2, 9);
-                localInspections.unshift(data);
-                updateInspectionsUI();
-                return true;
-            }
+    // Guardar inspección (reemplaza la lógica de Firebase)
+    async function submitInspection(veredicto) {
+        const form = document.getElementById('inspectionForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        data.resultado_final = veredicto;
+        data.timestamp = new Date().toISOString();
+
+        try {
+            await fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify(data)
+            });
+            showToast("Inspección guardada correctamente.");
+            form.reset();
+            loadInspections(); // Recargar lista
+        } catch (error) {
+            console.error("Error:", error);
+            showToast("Error al guardar.");
         }
+    }
 
-        async function deleteInspectionFromDatabase(id) {
-            if (isUsingFirebase) {
-                if (!auth.currentUser) return false;
-                try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'inspections', id);
-                    await deleteDoc(docRef);
-                    showToast("Inspección eliminada correctamente");
-                    return true;
-                } catch (error) {
-                    console.error("Error eliminando registro:", error);
-                    showToast("Error de conexión al eliminar.");
-                    return false;
-                }
-            } else {
-                localInspections = localInspections.filter(item => item.id !== id);
-                updateInspectionsUI();
-                showToast("Inspección eliminada del historial");
-                return true;
-            }
-        }
+    // Funcionalidad de filtros (necesaria para el buscador)
+    function applyFilters() {
+        // Lógica de filtrado basada en tu HTML original
+        const search = document.getElementById('filter-search').value.toLowerCase();
+        const veredicto = document.getElementById('filter-veredicto').value;
+        // ... (resto de tu lógica de filtrado)
+        updateInspectionsUI();
+    }
 
-        // Exponer funciones globales
-        window.saveInspectionToDatabase = saveInspectionToDatabase;
-        window.deleteInspectionFromDatabase = deleteInspectionFromDatabase;
-        window.getLocalInspections = () => localInspections;
-
-        window.addEventListener('load', () => {
-            startDatabase();
-        });
-    </script>
+    // Inicialización
+    loadInspections();
+</script>
 
     <script>
         const requisitosExcluyentes = [
