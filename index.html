@@ -389,71 +389,82 @@
             showToast("⚠️ Formulario restablecido por completo");
         }
 
-        // BUSCADOR INTELIGENTE CON BARRIDO FLEXIBLE POR PROXIMIDAD DE COLUMNAS
+        // BUSCADOR ULTRA-SEGURO ANTIRROTURA CON ELIMINACIÓN DE ACENTOS (TILDES)
         function getFieldSafe(row, key) {
             if (!row) return '';
             
-            // 1. Coincidencia exacta directa
+            // 1. CONTROL DE RESGUARDO ABSOLUTO: Coincidencia idéntica exacta.
+            // Esto garantiza al 100% que todo lo que ya te funcionaba siga andando igual.
             if (row[key] !== undefined && row[key] !== null) {
                 return row[key].toString().trim();
             }
 
-            const lowerKey = key.toLowerCase();
+            // Función para limpiar acentos/tildes y pasar a minúsculas
+            const normalizeStr = (str) => {
+                if (!str) return '';
+                return str.toString()
+                          .normalize("NFD")
+                          .replace(/[\u0300-\u036f]/g, "") // Remueve acentos nativamente
+                          .toLowerCase()
+                          .trim();
+            };
 
-            // 2. Coincidencia exacta en minúsculas
+            const cleanKey = normalizeStr(key);
+
+            // 2. Coincidencia exacta tras normalizar tildes
             for (let prop in row) {
-                if (prop.toLowerCase() === lowerKey) {
+                if (normalizeStr(prop) === cleanKey) {
                     return row[prop] !== undefined && row[prop] !== null ? row[prop].toString().trim() : '';
                 }
             }
 
-            // 3. Limpieza de guiones bajos y espacios (ej: venc_habilitacion -> venchabilitacion)
-            const ultraCleanKey = lowerKey.replace(/_/g, '').replace(/\s/g, '');
+            // 3. Limpieza profunda eliminando guiones bajos y espacios
+            const ultraClean = (str) => normalizeStr(str).replace(/_/g, '').replace(/\s/g, '');
+            const targetUltraClean = ultraClean(key);
             for (let prop in row) {
-                const ultraCleanProp = prop.toLowerCase().replace(/_/g, '').replace(/\s/g, '');
-                if (ultraCleanProp === ultraCleanKey) {
+                if (ultraClean(prop) === targetUltraClean) {
                     return row[prop] !== undefined && row[prop] !== null ? row[prop].toString().trim() : '';
                 }
             }
 
-            // 4. ALGORITMO INTEGRADO DE BÚSQUEDA PARA FECHAS DE VENCIMIENTO
+            // 4. ALGORITMO ANTITILDES PARA FECHAS DE VENCIMIENTO
             if (key.startsWith('venc_')) {
-                const id = key.replace('venc_', '').toLowerCase(); // Ej: 'habilitacion', 'vtv', 'seguro'
+                const id = normalizeStr(key.replace('venc_', '')); // Ej: "habilitacion"
                 for (let prop in row) {
-                    const lowerProp = prop.toLowerCase();
-                    // Si el nombre de la columna real de Excel contiene la palabra clave (ej: 'vtv') 
-                    // Y además contiene términos comunes de fecha ('venc', 'fecha', 'vcto', 'hasta', 'vencimiento')
-                    if (lowerProp.includes(id) && (lowerProp.includes('venc') || lowerProp.includes('fecha') || lowerProp.includes('vcto') || lowerProp.includes('hasta'))) {
+                    const propClean = normalizeStr(prop);
+                    // Si la columna real tiene el id ("habilitacion") ignorando acentos y tiene palabras de fecha
+                    if (propClean.includes(id) && (propClean.includes('venc') || propClean.includes('fecha') || propClean.includes('vcto') || propClean.includes('hasta'))) {
                         return row[prop] !== undefined && row[prop] !== null ? row[prop].toString().trim() : '';
                     }
                 }
             }
 
-            // 5. Inteligencia para Requisitos Excluyentes (excl_habilitacion)
+            // 5. Inteligencia para campos Excluyentes de Verificación
             if (key.startsWith('excl_')) {
-                const id = key.replace('excl_', '').toLowerCase();
+                const id = normalizeStr(key.replace('excl_', ''));
                 for (let prop in row) {
-                    const lowerProp = prop.toLowerCase();
-                    if (lowerProp.includes(id) && !lowerProp.includes('venc') && !lowerProp.includes('fecha') && !lowerProp.includes('vcto')) {
+                    const propClean = normalizeStr(prop);
+                    if (propClean.includes(id) && !propClean.includes('venc') && !propClean.includes('fecha') && !propClean.includes('vcto')) {
                         return row[prop] !== undefined && row[prop] !== null ? row[prop].toString().trim() : '';
                     }
                 }
             }
 
-            // 6. Inteligencia para Estados de Componentes (est_chapa)
+            // 6. Inteligencia para Estado Físico
             if (key.startsWith('est_')) {
-                const id = key.replace('est_', '').toLowerCase();
+                const id = normalizeStr(key.replace('est_', ''));
                 for (let prop in row) {
-                    const lowerProp = prop.toLowerCase();
-                    if (lowerProp.includes(id)) {
+                    const propClean = normalizeStr(prop);
+                    if (propClean.includes(id)) {
                         return row[prop] !== undefined && row[prop] !== null ? row[prop].toString().trim() : '';
                     }
                 }
             }
 
-            // 7. Búsqueda por similitud parcial general como último recurso
+            // 7. Respaldo por inclusión parcial aproximada
             for (let prop in row) {
-                if (prop.toLowerCase().includes(lowerKey) || lowerKey.includes(prop.toLowerCase())) {
+                const propClean = normalizeStr(prop);
+                if (propClean.includes(cleanKey) || cleanKey.includes(propClean)) {
                     return row[prop] !== undefined && row[prop] !== null ? row[prop].toString().trim() : '';
                 }
             }
@@ -461,35 +472,30 @@
             return '';
         }
 
-        // INTERPRETE Y FORMATEADOR UNIVERSAL DE FECHAS (Soporta ISO, text y timestamps)
+        // FORMATEADOR RESILIENTE DE FECHAS
         function formatDateResilient(dateStr) {
             if (!dateStr || dateStr === '-' || dateStr.toLowerCase() === 'undefined' || dateStr.trim() === '') {
                 return '---';
             }
             
-            // Si ya viene con el formato correcto DD/MM/AAAA, no lo tocamos
             if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
                 return dateStr.substring(0, 10);
             }
 
-            // Limpiar si viene con formato ISO extendido con "T"
             let cleanStr = dateStr;
             if (cleanStr.includes('T')) {
                 cleanStr = cleanStr.split('T')[0];
             }
 
-            // Intento 1: Formato estándar de formulario YYYY-MM-DD
             const partesDash = cleanStr.split('-');
             if (partesDash.length === 3 && partesDash[0].length === 4) {
                 return `${partesDash[2]}/${partesDash[1]}/${partesDash[0]}`;
             }
             
-            // Intento 2: Formato invertido DD-MM-YYYY
             if (partesDash.length === 3 && partesDash[2].length === 4) {
                 return `${partesDash[0]}/${partesDash[1]}/${partesDash[2]}`;
             }
 
-            // Intento 3: Si Google Sheets devuelve un Objeto Date serializado en texto nativo (Ej: "Mon Jul 13 2026...")
             try {
                 const d = new Date(dateStr);
                 if (!isNaN(d.getTime())) {
@@ -500,10 +506,9 @@
                 }
             } catch(e) {}
 
-            return dateStr; // Retorno de respaldo por si falla el parseo
+            return dateStr;
         }
 
-        // Función interactiva para expandir/colapsar filas del historial
         function toggleHistoryRow(rowId) {
             const detailRow = document.getElementById(rowId);
             const arrowIcon = document.getElementById('arrow-' + rowId);
@@ -516,7 +521,6 @@
             }
         }
 
-        // Leer datos históricos desde Sheets y generar el desglose interactivo
         async function fetchSheetsData() {
             const status = document.getElementById('db-status-text');
             const tbody = document.getElementById('inspections-tbody');
@@ -577,7 +581,6 @@
                     let badge = "bg-green-50 text-green-700 border border-green-200";
                     if(res.toLowerCase().includes('susp')) badge = "bg-red-50 text-red-700 border border-red-200";
 
-                    // Fila Principal
                     const trPrincipal = document.createElement('tr');
                     trPrincipal.className = "border-b border-gray-100 hover:bg-gray-50/80 transition-colors cursor-pointer font-medium";
                     trPrincipal.setAttribute('onclick', `toggleHistoryRow('${detailId}')`);
@@ -592,15 +595,11 @@
                     `;
                     tbody.appendChild(trPrincipal);
 
-                    // Procesar bloques HTML dinámicos para los ítems internos cargados
                     let htmlExcluyentes = '';
                     dictExcluyentes.forEach(item => {
                         const presenta = getFieldSafe(row, `excl_${item.id}`) || 'SI';
-                        
-                        // Obtenemos el vencimiento crudo usando el algoritmo de proximidad inteligente
                         let vencimientoCrudo = getFieldSafe(row, `venc_${item.id}`);
                         let vencFormateado = formatDateResilient(vencimientoCrudo);
-
                         const esFaltante = presenta === 'NO';
                         
                         htmlExcluyentes += `
@@ -640,7 +639,6 @@
                         </div>
                     `;
 
-                    // Fila Desplegable Oculta (Contenedor de Detalles)
                     const trDetalle = document.createElement('tr');
                     trDetalle.id = detailId;
                     trDetalle.className = "hidden bg-gray-50/60 shadow-inner";
@@ -648,8 +646,6 @@
                     trDetalle.innerHTML = `
                         <td colspan="6" class="p-4 border-b border-gray-200">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                
-                                <!-- Columna Documentación -->
                                 <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
                                     <h4 class="font-bold text-gray-700 mb-3 uppercase tracking-wider text-[10px] flex items-center gap-1 text-red-600 border-b border-gray-100 pb-1">
                                         <i class="fa-solid fa-file-shield"></i> Documentación / Excluyentes
@@ -658,8 +654,6 @@
                                         ${htmlExcluyentes}
                                     </div>
                                 </div>
-
-                                <!-- Columna Estado Vehicular -->
                                 <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
                                     <h4 class="font-bold text-gray-700 mb-3 uppercase tracking-wider text-[10px] flex items-center gap-1 text-blue-600 border-b border-gray-100 pb-1">
                                         <i class="fa-solid fa-wrench"></i> Estado Físico del Auto
@@ -668,10 +662,7 @@
                                         ${htmlComponentes}
                                     </div>
                                 </div>
-
                             </div>
-
-                            <!-- Barra Inferior Metadatos -->
                             <div class="mt-3 bg-white p-3 rounded-xl border border-gray-200 text-[11px] grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <div><span class="text-gray-400 font-bold uppercase text-[9px] block">Vehículo Real</span> <span class="font-semibold text-gray-700 uppercase">${autoMarca} ${autoModelo}</span></div>
                                 <div><span class="text-gray-400 font-bold uppercase text-[9px] block">Inspector Responsable</span> <span class="font-semibold text-gray-700 uppercase">${inspector}</span></div>
