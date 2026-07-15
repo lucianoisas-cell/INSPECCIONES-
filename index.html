@@ -294,11 +294,12 @@
                                 <th class="p-3">Dominio (Int)</th>
                                 <th class="p-3">Chofer</th>
                                 <th class="p-3 text-center">Estado</th>
+                                <th class="p-3 text-center">Borrar</th>
                             </tr>
                         </thead>
                         <tbody id="inspections-tbody" class="divide-y divide-gray-100 text-xs">
                             <tr>
-                                <td colspan="5" class="p-6 text-center text-gray-400">Cargando base de datos remota...</td>
+                                <td colspan="6" class="p-6 text-center text-gray-400">Cargando base de datos remota...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -339,6 +340,24 @@
         </div>
     </div>
 
+    <!-- Ventana Flotante de Detalle de Inspección (Historial) -->
+    <div id="detailModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs hidden items-center justify-center z-[9999] p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-100 p-6 max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center gap-3 mb-4 text-gray-800">
+                <div class="bg-blue-100 text-blue-600 p-2 rounded-xl">
+                    <i class="fa-solid fa-clipboard-list text-lg"></i>
+                </div>
+                <h3 class="font-bold text-base">Detalle de la Inspección</h3>
+            </div>
+
+            <div id="detailContent" class="space-y-2 text-sm"></div>
+
+            <button onclick="closeDetailModal()" class="w-full mt-5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 px-4 rounded-xl transition-colors text-sm">
+                Cerrar
+            </button>
+        </div>
+    </div>
+
     <!-- Elemento flotante para notificaciones rápidas -->
     <div id="toast" class="fixed bottom-5 right-5 bg-gray-900 text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-xl transition-all translate-y-20 opacity-0 pointer-events-none z-[99999]"></div>
 
@@ -346,6 +365,26 @@
     <script>
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzTZ9PfswMyo3VTvIgLMT8S92_YnnZJcoMmHCyZhZVczDCAjZtuOYU2WY5S4J6jpHr3NA/exec";
         let compiledWhatsAppText = "";
+        let currentData = []; // Guarda en memoria los registros ya cargados del Historial
+
+        // Etiquetas legibles para mostrar en la ventana de detalle
+        const etiquetasDetalle = {
+            FECHA: "Fecha",
+            EMPRESA: "Empresa",
+            INTERNO: "Interno",
+            PATENTE: "Patente",
+            MARCA: "Marca",
+            MODELO: "Modelo",
+            CHOFER: "Chofer",
+            INSPECTOR: "Inspector",
+            RESULTADO: "Resultado",
+            OBSERVACIONES: "Observaciones",
+            INDUMENTARIA: "Indumentaria / Prolijidad",
+            "HAB-REM": "Vencimiento Habilitación",
+            SEGURO: "Vencimiento Seguro",
+            VTV: "Vencimiento VTV",
+            REGISTRO: "Vencimiento Registro"
+        };
 
         // Al iniciar la carga estructurada del DOM
         document.addEventListener('DOMContentLoaded', () => {
@@ -406,16 +445,19 @@
                 
                 // Ordena descendente por marca temporal
                 data.sort((a, b) => new Date(b.FECHA || b.timestamp) - new Date(a.FECHA || a.timestamp));
-                
+
+                currentData = data; // Guardamos los registros para poder mostrarlos en el detalle
+
                 tbody.innerHTML = "";
                 if(data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">No hay registros cargados.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">No hay registros cargados.</td></tr>`;
                     return;
                 }
 
-                data.forEach(row => {
+                data.forEach((row, idx) => {
                     const tr = document.createElement('tr');
-                    tr.className = "border-b border-gray-100 hover:bg-gray-50 transition-colors";
+                    tr.className = "border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer";
+                    tr.onclick = () => verDetalle(idx);
                     
                     const f = (row.FECHA || row.timestamp || '').split('T')[0];
                     const emp = row.EMPRESA || row.empresa || '-';
@@ -433,6 +475,11 @@
                         <td class="p-3 text-gray-600 uppercase">${pat} <span class="text-gray-400">(${inter})</span></td>
                         <td class="p-3 text-gray-500 uppercase">${cho}</td>
                         <td class="p-3 text-center"><span class="px-2 py-0.5 rounded-md font-bold text-[10px] ${badge}">${res.toUpperCase()}</span></td>
+                        <td class="p-3 text-center">
+                            <button onclick="event.stopPropagation(); eliminarRegistro(${row._fila})" class="text-red-500 hover:text-red-700">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -441,6 +488,54 @@
                 console.error("Error cargando historial:", err);
                 if(status) status.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> Error de sincronización`;
             }
+        }
+
+        // Eliminar un registro de la planilla
+        async function eliminarRegistro(fila) {
+            if (!confirm("¿Seguro que querés borrar este registro? No se puede deshacer.")) return;
+
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ accion: "eliminar", fila: fila })
+                });
+                showToast("🗑️ Registro eliminado");
+                setTimeout(fetchSheetsData, 1500);
+            } catch (err) {
+                console.error("Error al eliminar:", err);
+                showToast("❌ Error al eliminar");
+            }
+        }
+
+        // Mostrar el detalle completo de una inspección del Historial
+        function verDetalle(idx) {
+            const row = currentData[idx];
+            if (!row) return;
+
+            const contenedor = document.getElementById('detailContent');
+            let html = "";
+
+            for (const clave in etiquetasDetalle) {
+                let valor = row[clave];
+                if (valor === undefined || valor === null || valor === "") valor = "-";
+                html += `
+                    <div class="flex justify-between gap-3 py-1.5 border-b border-gray-100">
+                        <span class="text-gray-500 text-xs font-bold uppercase">${etiquetasDetalle[clave]}</span>
+                        <span class="text-gray-800 text-right">${valor}</span>
+                    </div>
+                `;
+            }
+
+            contenedor.innerHTML = html;
+
+            const modal = document.getElementById('detailModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.replace('flex', 'hidden');
         }
 
         // Enviar inspección y armar reporte
