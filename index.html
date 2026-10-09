@@ -253,7 +253,7 @@
                 <div id="sec-cierre" class="p-5 space-y-4">
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Inspeccionado Por</label>
-                        <input type="text" name="inspector" placeholder="Nombre del inspector" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <input type="text" name="inspector" placeholder="Nombre del inspector" required class="w-full px-3 py-2 border border-gray-300 rounded-lg uppercase focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Observaciones</label>
@@ -629,6 +629,7 @@
 
             // Convertir datos a objeto plano para mandar a la API
             const payload = Object.fromEntries(formData.entries());
+            payload.inspector = (payload.inspector || '').trim().toUpperCase(); // el inspector siempre se guarda en MAYÚSCULAS
             payload.resultado_final = resultadoVeredicto;
             payload.timestamp = new Date().toISOString();
 
@@ -756,7 +757,7 @@
             txt += `🚗 *Patente:* ${getVal('patente').toUpperCase()}\n`;
             txt += `🚘 *Auto:* ${getVal('marca')} ${getVal('modelo')}\n`;
             txt += `🧑‍✈️ *Chofer:* ${getVal('chofer')}\n`;
-            txt += `📝 *Inspector:* ${getVal('inspector')}\n\n`;
+            txt += `📝 *Inspector:* ${getVal('inspector').toUpperCase()}\n\n`;
 
             // Bloque de vencimientos de la documentación principal
             const docsVenc = [
