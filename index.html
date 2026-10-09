@@ -421,6 +421,7 @@
     <script>
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzTZ9PfswMyo3VTvIgLMT8S92_YnnZJcoMmHCyZhZVczDCAjZtuOYU2WY5S4J6jpHr3NA/exec";
         let compiledWhatsAppText = "";
+        let maestroCache = null; // Copia de la hoja MAESTRO para completar vencimientos en el WhatsApp
         let currentData = []; // Guarda en memoria los registros ya cargados del Historial
 
         // Etiquetas legibles para mostrar en la ventana de detalle
@@ -616,6 +617,14 @@
             const formData = new FormData(form);
             
             // 1. Armar el Texto Formateado para WhatsApp de forma precisa
+            // (si todavía no se bajó la hoja MAESTRO, se baja ahora para traer los vencimientos)
+            if (!maestroCache) {
+                try {
+                    const r = await fetch(`${GOOGLE_SCRIPT_URL}?action=maestro`);
+                    const d = await r.json();
+                    if (Array.isArray(d)) maestroCache = d;
+                } catch (e) { console.warn('No se pudo traer MAESTRO para el mensaje', e); }
+            }
             buildWhatsAppText(formData, resultadoVeredicto);
 
             // Convertir datos a objeto plano para mandar a la API
@@ -708,16 +717,35 @@
                 const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
                 return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '');
             };
-            const estadoVenc = (iso) => {
-                const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                if (!m) return '';
+            const fmtDate = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            const estadoDate = (venc) => {
                 const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-                const venc = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
                 const dias = Math.round((venc - hoy) / 86400000);
                 if (dias < 0) return `🔴 VENCIDO hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'}`;
                 if (dias === 0) return '🟠 VENCE HOY';
                 if (dias <= 30) return `🟠 vence en ${dias} día${dias === 1 ? '' : 's'}`;
                 return '🟢 vigente';
+            };
+            const isoToDate = (iso) => {
+                const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                return m ? new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)) : null;
+            };
+            // Datos del vehículo en la hoja MAESTRO (por interno), para completar vencimientos
+            const internoForm = getVal('interno').replace(/\D/g, '');
+            const filaMaestro = (maestroCache || []).find(r => (r['INTERNO'] || '').toString().replace(/\D/g, '') === internoForm && internoForm !== '') || null;
+            const claveMaestro = { habilitacion: 'HAB-REM', seguro: 'SEGURO-REM', vtv: 'VTV-REM', registro: 'REGISTRO' };
+
+            // Devuelve el texto "dd/mm/aaaa (estado)" priorizando lo cargado en el formulario
+            const textoVenc = (id) => {
+                const dForm = isoToDate(getVal('venc_' + id));
+                if (dForm) return `${fmtDate(dForm)} (${estadoDate(dForm)})`;
+                if (filaMaestro && claveMaestro[id]) {
+                    const crudo = filaMaestro[claveMaestro[id]];
+                    const dM = parseFechaFlexible(crudo);
+                    if (dM) return `${fmtDate(dM)} (${estadoDate(dM)})`;
+                    if (crudo !== undefined && crudo !== null && crudo.toString().trim() !== '') return `${crudo.toString().trim()}`;
+                }
+                return 'sin fecha cargada';
             };
 
             // Composición final del cuerpo de texto estructurado
@@ -739,18 +767,13 @@
             ];
             txt += `*📆 VENCIMIENTOS:*\n`;
             docsVenc.forEach(([id, label]) => {
-                const iso = getVal('venc_' + id);
                 const presenta = getVal('excl_' + id);
-                if (iso) {
-                    txt += `- ${label}: ${fmtFecha(iso)} (${estadoVenc(iso)})${presenta === 'NO' ? ' ⚠️ NO PRESENTA' : ''}\n`;
-                } else {
-                    txt += `- ${label}: sin fecha cargada${presenta === 'NO' ? ' ⚠️ NO PRESENTA' : ''}\n`;
-                }
+                txt += `- ${label}: ${textoVenc(id)}${presenta === 'NO' ? ' ⚠️ NO PRESENTA' : ''}\n`;
             });
-            // Otros ítems con vencimiento cargado (cédula, oblea, matafuego...)
+            // Otros ítems con vencimiento cargado en el formulario (cédula, oblea, matafuego...)
             ['cedula', 'oblea', 'matafuego'].forEach(id => {
-                const iso = getVal('venc_' + id);
-                if (iso) txt += `- ${dictExcluyentes[id]}: ${fmtFecha(iso)} (${estadoVenc(iso)})\n`;
+                const d = isoToDate(getVal('venc_' + id));
+                if (d) txt += `- ${dictExcluyentes[id]}: ${fmtDate(d)} (${estadoDate(d)})\n`;
             });
             txt += `\n`;
 
@@ -862,6 +885,7 @@
                     return;
                 }
 
+                maestroCache = data;
                 const stats = computeDashboardStats(data);
                 renderDashboard(stats);
 
