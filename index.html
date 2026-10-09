@@ -259,6 +259,22 @@
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Observaciones</label>
                         <textarea name="observaciones" rows="3" placeholder="Detalles o aclaraciones adicionales..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
                     </div>
+                    <!-- FOTOS DEL PROBLEMA (solo para adjuntar al WhatsApp; no se suben a Sheets) -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Fotos (opcional)</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" onclick="document.getElementById('foto-camara').click()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-camera"></i> Tomar foto
+                            </button>
+                            <button type="button" onclick="document.getElementById('foto-galeria').click()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-image"></i> Galería
+                            </button>
+                        </div>
+                        <input type="file" id="foto-camara" accept="image/*" capture="environment" class="hidden" onchange="agregarFotos(this)">
+                        <input type="file" id="foto-galeria" accept="image/*" multiple class="hidden" onchange="agregarFotos(this)">
+                        <div id="fotos-previa" class="flex flex-wrap gap-2 mt-2"></div>
+                        <p id="fotos-ayuda" class="text-[11px] text-gray-400 mt-1 hidden">Las fotos se adjuntan al mensaje de WhatsApp. No se guardan en la planilla.</p>
+                    </div>
                 </div>
             </div>
 
@@ -378,6 +394,7 @@
             </div>
             
             <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Vista Previa del Informe:</label>
+            <p id="shareFotosInfo" class="hidden text-xs font-bold text-blue-600 mb-2"></p>
             <textarea id="shareTextPreview" readonly class="w-full h-56 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-700 focus:outline-none mb-4 resize-none leading-relaxed"></textarea>
             
             <div class="flex flex-col gap-2">
@@ -497,6 +514,7 @@
         function clearForm() {
             const form = document.getElementById('inspectionForm');
             form.reset();
+            limpiarFotos();
             document.getElementById('campo-fecha').value = new Date().toISOString().split('T')[0];
             showToast("⚠️ Formulario restablecido por completo");
         }
@@ -645,6 +663,13 @@
 
                 // Abrir modal de compartir
                 document.getElementById('shareTextPreview').value = compiledWhatsAppText;
+                const infoFotos = document.getElementById('shareFotosInfo');
+                if (fotosInspeccion.length > 0) {
+                    infoFotos.textContent = `📷 ${fotosInspeccion.length} foto${fotosInspeccion.length === 1 ? '' : 's'} se adjuntará${fotosInspeccion.length === 1 ? '' : 'n'} al mensaje`;
+                    infoFotos.classList.remove('hidden');
+                } else {
+                    infoFotos.classList.add('hidden');
+                }
                 const modal = document.getElementById('shareModal');
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
@@ -801,8 +826,93 @@
         }
 
         // Acciones del cuadro de compartir
-        function shareViaWhatsApp() {
+        async function shareViaWhatsApp() {
+            // Con fotos: se usa el menú "Compartir" del celular (es la única forma de adjuntar imágenes desde una web)
+            if (fotosInspeccion.length > 0) {
+                try {
+                    const archivos = fotosInspeccion.map(f => f.file);
+                    if (navigator.canShare && navigator.canShare({ files: archivos })) {
+                        // Se copia el texto por si WhatsApp no lo toma como pie de la foto
+                        try { await navigator.clipboard.writeText(compiledWhatsAppText); } catch (e) {}
+                        await navigator.share({ files: archivos, text: compiledWhatsAppText });
+                        return;
+                    }
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return; // el usuario canceló
+                    console.warn('No se pudo compartir con fotos:', err);
+                }
+                showToast("⚠️ Este dispositivo no permite adjuntar fotos automáticamente. Se abre WhatsApp con el texto; adjuntalas a mano.");
+            }
             window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(compiledWhatsAppText)}`, '_blank');
+        }
+
+        // ==========================================
+        // FOTOS DE LA INSPECCIÓN (solo en memoria, para adjuntar al WhatsApp)
+        // ==========================================
+        let fotosInspeccion = []; // [{ file, url }]
+        const MAX_FOTOS = 6;
+
+        // Achica la foto (máx. 1280 px, JPG) para que se envíe rápido por WhatsApp
+        function comprimirImagen(file) {
+            return new Promise((resolve) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    const max = 1280;
+                    const escala = Math.min(1, max / Math.max(img.width, img.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * escala);
+                    canvas.height = Math.round(img.height * escala);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    canvas.toBlob((blob) => {
+                        if (!blob) return resolve(file);
+                        const nombre = `inspeccion_${Date.now()}_${Math.floor(Math.random() * 1000)}.jpg`;
+                        resolve(new File([blob], nombre, { type: 'image/jpeg' }));
+                    }, 'image/jpeg', 0.8);
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+                img.src = url;
+            });
+        }
+
+        async function agregarFotos(input) {
+            const archivos = Array.from(input.files || []);
+            input.value = ''; // permite volver a elegir la misma foto
+            for (const archivo of archivos) {
+                if (fotosInspeccion.length >= MAX_FOTOS) {
+                    showToast(`Máximo ${MAX_FOTOS} fotos por inspección`);
+                    break;
+                }
+                const comprimida = await comprimirImagen(archivo);
+                fotosInspeccion.push({ file: comprimida, url: URL.createObjectURL(comprimida) });
+            }
+            renderFotos();
+        }
+
+        function quitarFoto(i) {
+            if (fotosInspeccion[i]) URL.revokeObjectURL(fotosInspeccion[i].url);
+            fotosInspeccion.splice(i, 1);
+            renderFotos();
+        }
+
+        function limpiarFotos() {
+            fotosInspeccion.forEach(f => URL.revokeObjectURL(f.url));
+            fotosInspeccion = [];
+            renderFotos();
+        }
+
+        function renderFotos() {
+            const cont = document.getElementById('fotos-previa');
+            if (!cont) return;
+            cont.innerHTML = fotosInspeccion.map((f, i) => `
+                <div class="relative w-20 h-20">
+                    <img src="${f.url}" class="w-20 h-20 object-cover rounded-lg border border-gray-300">
+                    <button type="button" onclick="quitarFoto(${i})" class="absolute -top-2 -right-2 bg-red-600 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center shadow">✕</button>
+                </div>
+            `).join('');
+            const ayuda = document.getElementById('fotos-ayuda');
+            if (ayuda) ayuda.classList.toggle('hidden', fotosInspeccion.length === 0);
         }
 
         function copyToClipboard() {
@@ -816,6 +926,7 @@
         }
 
         function closeShareModal() {
+            limpiarFotos();
             document.getElementById('shareModal').classList.replace('flex', 'hidden');
         }
 
