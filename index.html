@@ -703,9 +703,26 @@
 
             const emojiHeader = veredicto.toLowerCase().includes('aprob') ? '✅' : '⛔';
 
+            // --- Helpers de fechas (vencimientos) ---
+            const fmtFecha = (iso) => {
+                const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '');
+            };
+            const estadoVenc = (iso) => {
+                const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (!m) return '';
+                const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+                const venc = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+                const dias = Math.round((venc - hoy) / 86400000);
+                if (dias < 0) return `🔴 VENCIDO hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'}`;
+                if (dias === 0) return '🟠 VENCE HOY';
+                if (dias <= 30) return `🟠 vence en ${dias} día${dias === 1 ? '' : 's'}`;
+                return '🟢 vigente';
+            };
+
             // Composición final del cuerpo de texto estructurado
             let txt = `*INSPECCIÓN DE AUTO - ${veredicto.toUpperCase()} ${emojiHeader}*\n\n`;
-            txt += `📅 *Fecha:* ${getVal('fecha')}\n`;
+            txt += `📅 *Fecha:* ${fmtFecha(getVal('fecha'))}\n`;
             txt += `🏢 *Empresa:* ${getVal('empresa')}\n`;
             txt += `🔢 *Interno:* ${getVal('interno')}\n`;
             txt += `🚗 *Patente:* ${getVal('patente').toUpperCase()}\n`;
@@ -713,15 +730,46 @@
             txt += `🧑‍✈️ *Chofer:* ${getVal('chofer')}\n`;
             txt += `📝 *Inspector:* ${getVal('inspector')}\n\n`;
 
+            // Bloque de vencimientos de la documentación principal
+            const docsVenc = [
+                ['habilitacion', 'Habilitación Remis'],
+                ['seguro', 'Seguro'],
+                ['vtv', 'VTV'],
+                ['registro', 'Registro']
+            ];
+            txt += `*📆 VENCIMIENTOS:*\n`;
+            docsVenc.forEach(([id, label]) => {
+                const iso = getVal('venc_' + id);
+                const presenta = getVal('excl_' + id);
+                if (iso) {
+                    txt += `- ${label}: ${fmtFecha(iso)} (${estadoVenc(iso)})${presenta === 'NO' ? ' ⚠️ NO PRESENTA' : ''}\n`;
+                } else {
+                    txt += `- ${label}: sin fecha cargada${presenta === 'NO' ? ' ⚠️ NO PRESENTA' : ''}\n`;
+                }
+            });
+            // Otros ítems con vencimiento cargado (cédula, oblea, matafuego...)
+            ['cedula', 'oblea', 'matafuego'].forEach(id => {
+                const iso = getVal('venc_' + id);
+                if (iso) txt += `- ${dictExcluyentes[id]}: ${fmtFecha(iso)} (${estadoVenc(iso)})\n`;
+            });
+            txt += `\n`;
+
             if (faltantesDoc.length > 0) {
                 txt += `*⚠️ DOCUMENTACIÓN / EXCLUYENTES FALTANTES:*\n`;
                 txt += faltantesDoc.map(item => `- ${item}`).join('\n') + `\n\n`;
+            } else {
+                txt += `*✅ Documentación y excluyentes:* todo presentado\n\n`;
             }
 
             if (fallasAuto.length > 0) {
                 txt += `*🔧 REPARACIONES / FALLAS ENCONTRADAS:*\n`;
                 txt += fallasAuto.map(item => `- ${item}`).join('\n') + `\n\n`;
+            } else {
+                txt += `*🔧 Estado del vehículo:* sin fallas (todo BUENO)\n\n`;
             }
+
+            const prolij = getVal('cond_prolijidad');
+            if (prolij) txt += `🧑‍✈️ *Prolijidad del conductor:* ${prolij}\n\n`;
 
             let obs = getVal('observaciones');
             if (obs && obs.toLowerCase() !== 'ninguna') {
