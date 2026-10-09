@@ -414,6 +414,15 @@
                     </div>
                 </div>
 
+                <!-- Unidades suspendidas y críticas (sale de ESTADO / OBSERVACIONES de la hoja MAESTRO) -->
+                <div class="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Unidades suspendidas y críticas <span class="text-gray-500 font-normal normal-case">· según Observaciones</span></p>
+                        <div id="dash-criticos-resumen" class="flex gap-2 text-[11px] font-bold"></div>
+                    </div>
+                    <div id="dash-criticos" class="space-y-2 max-h-96 overflow-y-auto"></div>
+                </div>
+
                 <!-- Cola de urgencia -->
                 <div class="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
                     <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-3">Cola de urgencia <span class="text-gray-500 font-normal normal-case">· de más vencido a más lejano</span></p>
@@ -1059,6 +1068,7 @@
                 }
 
                 maestroCache = data;
+                try { renderCriticos(data); } catch (e) { console.warn('No se pudo armar el listado de críticos', e); }
                 const stats = computeDashboardStats(data);
                 renderDashboard(stats);
 
@@ -1069,6 +1079,70 @@
                 errorBox.classList.remove('hidden');
                 subtitle.textContent = 'Error de sincronización.';
             }
+        }
+
+        // ==========================================
+        // UNIDADES SUSPENDIDAS Y CRÍTICAS (a partir de ESTADO y OBSERVACIONES)
+        // Es una detección por palabras clave sobre texto libre: revisar siempre la observación completa.
+        // ==========================================
+        const PALABRAS_CRITICAS = /VENCID|SIN (HAB|MATAFUEGO|SEGURO|REGISTRO|VTV)|NO TIENE (REGISTRO|MATAFUEGO|SEGURO|HAB)|ROTO|ROTA|NO FUNCIONA|NO ANDA|MALO|MALAS|MUY MAL|AUSENTE|NO SE PRESENT/i;
+
+        function escaparHtml(t) {
+            return (t === null || t === undefined ? '' : t.toString())
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function clasificarUnidad(r) {
+            if (estaDadoDeBaja(r['ESTADO'])) return null; // las bajas no se muestran
+            const estado = (r['ESTADO'] || '').toString().toUpperCase();
+            const obs = (r['OBSERVACIONES'] || '').toString();
+            const reactivada = cargarValorTexto(r['REACTIVADO']);
+            if (reactivada) return null; // si ya fue reactivada, el problema se dio por resuelto
+            if (estado.includes('SUSPEND') || obs.toUpperCase().includes('SUSPEND')) return 'SUSPENDIDO';
+            if (obs && PALABRAS_CRITICAS.test(obs)) return 'CRITICO';
+            return null;
+        }
+
+        function renderCriticos(rows) {
+            const cont = document.getElementById('dash-criticos');
+            const resumen = document.getElementById('dash-criticos-resumen');
+            if (!cont || !resumen) return;
+
+            const lista = [];
+            rows.forEach(r => {
+                const tipo = clasificarUnidad(r);
+                if (tipo) lista.push({ tipo, r });
+            });
+            lista.sort((a, b) => (a.tipo === b.tipo ? 0 : a.tipo === 'SUSPENDIDO' ? -1 : 1)
+                || (parseInt(a.r['INTERNO'], 10) || 0) - (parseInt(b.r['INTERNO'], 10) || 0));
+
+            const nSusp = lista.filter(x => x.tipo === 'SUSPENDIDO').length;
+            const nCrit = lista.length - nSusp;
+            resumen.innerHTML = `
+                <span class="px-2 py-1 rounded-md bg-red-900/60 text-red-300 border border-red-700">🔴 ${nSusp} suspendida${nSusp === 1 ? '' : 's'}</span>
+                <span class="px-2 py-1 rounded-md bg-orange-900/50 text-orange-300 border border-orange-700">🟠 ${nCrit} crítica${nCrit === 1 ? '' : 's'}</span>`;
+
+            if (lista.length === 0) {
+                cont.innerHTML = `<p class="text-xs text-gray-500 py-3">No hay unidades suspendidas ni críticas.</p>`;
+                return;
+            }
+
+            cont.innerHTML = lista.map(({ tipo, r }) => {
+                const susp = tipo === 'SUSPENDIDO';
+                const caja = susp ? 'border-red-700 bg-red-950/50' : 'border-orange-700 bg-orange-950/40';
+                const chip = susp ? 'bg-red-600 text-white' : 'bg-orange-500 text-white';
+                const interno = escaparHtml(r['INTERNO']);
+                const veh = escaparHtml(`${r['VEHICULO'] || ''} ${r['MODELO'] || ''}`.trim());
+                const desde = susp && cargarValorTexto(r['SUSPENDIDO']) ? ` · desde ${escaparHtml(r['SUSPENDIDO'])}` : '';
+                return `
+                <div class="rounded-lg border ${caja} p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="font-bold text-gray-100 text-sm">Int. ${interno} <span class="text-gray-400 font-normal text-xs">${escaparHtml(r['PATENTE'])} · ${veh}${desde}</span></p>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${chip}">${susp ? 'SUSPENDIDO' : 'CRÍTICO'}</span>
+                    </div>
+                    <p class="text-xs text-gray-300 mt-1 leading-snug">${escaparHtml(r['OBSERVACIONES']) || '<span class="text-gray-500">Sin observación</span>'}</p>
+                </div>`;
+            }).join('');
         }
 
         function computeDashboardStats(rows) {
