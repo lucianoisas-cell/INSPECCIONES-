@@ -763,17 +763,14 @@
                 ['habilitacion', 'Habilitación Remis'],
                 ['seguro', 'Seguro'],
                 ['vtv', 'VTV'],
-                ['registro', 'Registro']
+                ['registro', 'Registro'],
+                ['oblea', 'Oblea GNC'],
+                ['matafuego', 'Matafuego']
             ];
             txt += `*📆 VENCIMIENTOS:*\n`;
             docsVenc.forEach(([id, label]) => {
                 const presenta = getVal('excl_' + id);
                 txt += `- ${label}: ${textoVenc(id)}${presenta === 'NO' ? ' ⚠️ NO PRESENTA' : ''}\n`;
-            });
-            // Otros ítems con vencimiento cargado en el formulario (cédula, oblea, matafuego...)
-            ['cedula', 'oblea', 'matafuego'].forEach(id => {
-                const d = isoToDate(getVal('venc_' + id));
-                if (d) txt += `- ${dictExcluyentes[id]}: ${fmtDate(d)} (${estadoDate(d)})\n`;
             });
             txt += `\n`;
 
