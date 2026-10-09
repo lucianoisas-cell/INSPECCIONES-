@@ -113,11 +113,12 @@
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Empresa</label>
-                        <input type="text" name="empresa" placeholder="Ej. Canning" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <input type="text" name="empresa" value="CANNING" readonly required class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-bold uppercase focus:outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Interno</label>
-                        <input type="text" name="interno" placeholder="Número de interno" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <input type="text" name="interno" id="campo-interno" inputmode="numeric" autocomplete="off" oninput="programarAutocompletar()" onchange="autocompletarPorInterno()" placeholder="Número de interno" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <p id="interno-hint" class="hidden text-[11px] mt-1"></p>
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Patente</label>
@@ -353,6 +354,26 @@
                     </button>
                 </div>
                 
+                <!-- Contadores, buscador y filtros -->
+                <div id="hist-resumen" class="flex flex-wrap gap-2 text-[11px] mb-3"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-3">
+                    <input type="text" id="hist-buscar" placeholder="Buscar interno, patente o chofer..." class="sm:col-span-4 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <select id="hist-inspector" class="px-2 py-2 border border-gray-300 rounded-lg text-xs"><option value="">Todos los inspectores</option></select>
+                    <select id="hist-resultado" class="px-2 py-2 border border-gray-300 rounded-lg text-xs">
+                        <option value="">Todos los resultados</option>
+                        <option value="APROB">Aprobados</option>
+                        <option value="SUSP">Suspendidos</option>
+                    </select>
+                    <select id="hist-periodo" class="px-2 py-2 border border-gray-300 rounded-lg text-xs sm:col-span-2">
+                        <option value="">Todo el período</option>
+                        <option value="hoy">Hoy</option>
+                        <option value="7">Últimos 7 días</option>
+                        <option value="mes">Este mes</option>
+                    </select>
+                </div>
+                <!-- Ficha de la unidad buscada -->
+                <div id="hist-ficha" class="hidden bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3"></div>
+
                 <div class="overflow-x-auto rounded-lg border border-gray-100">
                     <table class="w-full text-left border-collapse min-w-[600px]">
                         <thead>
@@ -389,9 +410,14 @@
                         </h2>
                         <p id="dash-subtitle" class="text-[11px] text-gray-400">Cargando datos de la hoja MAESTRO...</p>
                     </div>
-                    <button onclick="fetchMaestroData()" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1">
-                        <i class="fa-solid fa-rotate"></i> Actualizar
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="prepararWhatsAppVencimientos()" class="text-xs bg-green-700 hover:bg-green-600 text-white font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1">
+                            <i class="fa-brands fa-whatsapp"></i> Vencimientos
+                        </button>
+                        <button onclick="fetchMaestroData()" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-rotate"></i> Actualizar
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Aviso de error -->
@@ -401,6 +427,9 @@
 
                 <!-- KPIs -->
                 <div id="dash-kpis" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></div>
+
+                <!-- Meta de fin de año -->
+                <div id="dash-meta" class="bg-gray-800/60 rounded-xl p-4 border border-gray-700"></div>
 
                 <!-- Gráfico + Cobertura -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -421,6 +450,15 @@
                         <div id="dash-criticos-resumen" class="flex gap-2 text-[11px] font-bold"></div>
                     </div>
                     <div id="dash-criticos" class="space-y-2 max-h-96 overflow-y-auto"></div>
+                </div>
+
+                <!-- Reincidentes (a partir del historial de inspecciones) -->
+                <div class="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Unidades reincidentes <span class="text-gray-500 font-normal normal-case">· 2 o más inspecciones con suspensión u observaciones</span></p>
+                        <div id="dash-reincidentes-resumen" class="flex gap-2 text-[11px] font-bold"></div>
+                    </div>
+                    <div id="dash-reincidentes" class="space-y-2 max-h-96 overflow-y-auto"></div>
                 </div>
 
                 <!-- Cola de urgencia -->
@@ -444,8 +482,8 @@
                     <i class="fa-solid fa-share-nodes text-lg"></i>
                 </div>
                 <div>
-                    <h3 class="font-bold text-base">¡Registro Guardado con Éxito!</h3>
-                    <p class="text-xs text-gray-500">Los datos se subieron a Google Sheets.</p>
+                    <h3 id="shareTitulo" class="font-bold text-base">¡Registro Guardado con Éxito!</h3>
+                    <p id="shareSub" class="text-xs text-gray-500">Los datos se subieron a Google Sheets.</p>
                 </div>
             </div>
             
@@ -510,6 +548,536 @@
             actualizarIconoTema();
         }
         document.addEventListener('DOMContentLoaded', actualizarIconoTema);
+
+        // ==========================================================
+        // MEJORAS: autocompletar, buscador/filtros del historial, meta,
+        // reincidentes, borrador automático y WhatsApp de vencimientos
+        // ==========================================================
+        const META_FECHA = new Date(2026, 10, 30);   // hay que terminar antes de diciembre
+        const CAPACIDAD_DIARIA = 4;                   // inspecciones por día hábil
+        let modalModo = 'inspeccion';                 // 'inspeccion' | 'vencimientos'
+
+        function normInterno(v) {
+            return (v === null || v === undefined ? '' : v.toString()).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+        }
+        function fmtDMA(d) {
+            return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        }
+        function fechaAIso(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        // Acepta dd/mm/aaaa (con o sin hora) y formatos ISO
+        function parseFechaHora(val) {
+            if (val === null || val === undefined || val === '') return null;
+            if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+            const s = val.toString().trim();
+            let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+            if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+            m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+            if (m) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        async function cargarMaestro(forzar) {
+            if (maestroCache && !forzar) return maestroCache;
+            try {
+                const r = await fetch(`${GOOGLE_SCRIPT_URL}?action=maestro`);
+                const d = await r.json();
+                if (Array.isArray(d)) maestroCache = d;
+            } catch (e) { console.warn('No se pudo bajar MAESTRO', e); }
+            return maestroCache || [];
+        }
+        async function cargarHistorial(forzar) {
+            if (currentData.length && !forzar) return currentData;
+            try {
+                const r = await fetch(GOOGLE_SCRIPT_URL);
+                const d = await r.json();
+                if (Array.isArray(d)) currentData = d;
+            } catch (e) { console.warn('No se pudo bajar el historial', e); }
+            return currentData;
+        }
+        function filaMaestroPorInterno(n) {
+            return (maestroCache || []).find(r => normInterno(r['INTERNO']) === n) || null;
+        }
+        function esSuspension(row) {
+            return (row.RESULTADO || row.resultado_final || '').toString().toLowerCase().includes('susp');
+        }
+        function tieneObservacion(row) {
+            const o = (row.OBSERVACIONES || row.observaciones || '').toString().trim().toLowerCase();
+            return o !== '' && o !== 'ninguna' && o !== '-' && o !== 'sin observaciones';
+        }
+        // Estado de un vencimiento: texto + color
+        function estadoDoc(raw) {
+            const f = parseFechaFlexible(raw);
+            if (!f) {
+                const t = (raw === null || raw === undefined) ? '' : raw.toString().trim();
+                return { texto: t || 'sin dato', clase: 'text-gray-400' };
+            }
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const dias = Math.round((f - hoy) / 86400000);
+            if (dias < 0) return { texto: `${fmtDMA(f)} · vencido hace ${-dias} d`, clase: 'text-red-600 font-bold' };
+            if (dias <= 30) return { texto: `${fmtDMA(f)} · vence en ${dias} d`, clase: 'text-orange-500 font-bold' };
+            return { texto: `${fmtDMA(f)} · vigente`, clase: 'text-green-600' };
+        }
+
+        // ---------- 1) AUTOCOMPLETAR POR INTERNO ----------
+        let autoTimer = null;
+        const CAMPOS_AUTO = ['patente', 'marca', 'modelo', 'venc_habilitacion', 'venc_seguro', 'venc_vtv', 'venc_registro'];
+
+        function programarAutocompletar() {
+            clearTimeout(autoTimer);
+            autoTimer = setTimeout(autocompletarPorInterno, 350);
+        }
+        function campoForm(name) {
+            return document.querySelector(`#inspectionForm [name="${name}"]`);
+        }
+        function limpiarAuto() {
+            CAMPOS_AUTO.forEach(n => {
+                const el = campoForm(n);
+                if (el && el.dataset.auto === '1') { el.value = ''; el.dataset.auto = '0'; }
+            });
+        }
+        function setAuto(name, valor) {
+            const el = campoForm(name);
+            if (!el || !valor) return;
+            if (el.value && el.dataset.auto !== '1') return; // no pisar lo que escribió la persona
+            el.value = valor;
+            el.dataset.auto = '1';
+        }
+        async function autocompletarPorInterno() {
+            const inp = document.getElementById('campo-interno');
+            const hint = document.getElementById('interno-hint');
+            if (!inp || !hint) return;
+            const n = normInterno(inp.value);
+            limpiarAuto();
+            if (!n) { hint.classList.add('hidden'); return; }
+            hint.className = 'text-[11px] mt-1 text-gray-400';
+            hint.textContent = 'Buscando el interno en la planilla...';
+            await cargarMaestro();
+            if (normInterno(inp.value) !== n) return; // cambió mientras se buscaba
+            const r = filaMaestroPorInterno(n);
+            if (!r) {
+                hint.className = 'text-[11px] mt-1 text-orange-500 font-semibold';
+                hint.textContent = '⚠️ Este interno no figura en la planilla MAESTRO. Completá los datos a mano.';
+                return;
+            }
+            limpiarAuto();
+            setAuto('patente', (r['PATENTE'] || '').toString().trim().toUpperCase());
+            setAuto('marca', (r['VEHICULO'] || '').toString().trim());
+            setAuto('modelo', `${(r['MODELO'] || '').toString().trim()} ${(r['AÑO'] || '').toString().replace(/\.0$/, '')}`.trim());
+            const mapaVenc = { venc_habilitacion: 'HAB-REM', venc_seguro: 'SEGURO-REM', venc_vtv: 'VTV-REM', venc_registro: 'REGISTRO' };
+            Object.keys(mapaVenc).forEach(campo => {
+                const f = parseFechaFlexible(r[mapaVenc[campo]]);
+                if (f) setAuto(campo, fechaAIso(f));
+            });
+            let msg = `✔ ${escaparHtml((r['VEHICULO'] || '') + ' ' + (r['MODELO'] || ''))} · ${escaparHtml(r['PATENTE'])}`;
+            let clase = 'text-green-600 font-semibold';
+            const estado = (r['ESTADO'] || '').toString().trim();
+            if (estaDadoDeBaja(estado)) { msg = `⛔ Interno dado de BAJA (${escaparHtml(estado)}) · ${escaparHtml(r['PATENTE'])}`; clase = 'text-red-600 font-bold'; }
+            else if (estado.toUpperCase().includes('SUSPEND')) { msg += ` · ⚠️ ${escaparHtml(estado)}`; clase = 'text-orange-500 font-bold'; }
+            hint.className = 'text-[11px] mt-1 ' + clase;
+            hint.innerHTML = msg;
+            // Último antecedente en el historial
+            cargarHistorial().then(h => {
+                if (normInterno(inp.value) !== n) return;
+                const previas = h.filter(x => normInterno(x.INTERNO || x.interno) === n);
+                if (previas.length) {
+                    const u = previas[0];
+                    const fh = parseFechaHora(u.FECHA || u.timestamp);
+                    hint.innerHTML = msg + `<br><span class="text-gray-400 font-normal">Última inspección: ${fh ? fmtDMA(fh) : '-'} · ${escaparHtml(u.RESULTADO || u.resultado_final || '-')} · Chofer: ${escaparHtml(u.CHOFER || u.chofer || '-')}</span>`;
+                }
+            });
+        }
+
+        // ---------- 3 y 4) HISTORIAL: BUSCADOR, FICHA, FILTROS Y CONTADORES ----------
+        let fichaToken = 0;
+        function poblarFiltroInspectores() {
+            const sel = document.getElementById('hist-inspector');
+            if (!sel) return;
+            const actual = sel.value;
+            const set = new Set();
+            currentData.forEach(r => {
+                const i = (r.INSPECTOR || r.inspector || '').toString().trim().toUpperCase();
+                if (i) set.add(i);
+            });
+            sel.innerHTML = '<option value="">Todos los inspectores</option>' +
+                Array.from(set).sort().map(i => `<option value="${escaparHtml(i)}">${escaparHtml(i)}</option>`).join('');
+            sel.value = set.has(actual) ? actual : '';
+        }
+
+        function renderHistorial() {
+            const tbody = document.getElementById('inspections-tbody');
+            if (!tbody) return;
+            const q = (document.getElementById('hist-buscar').value || '').trim().toUpperCase();
+            const fInsp = document.getElementById('hist-inspector').value;
+            const fRes = document.getElementById('hist-resultado').value;
+            const fPer = document.getElementById('hist-periodo').value;
+
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 6);
+
+            // Contadores (sobre todo el historial)
+            let nHoy = 0, nMes = 0;
+            currentData.forEach(r => {
+                const d = parseFechaHora(r.FECHA || r.timestamp);
+                if (!d) return;
+                if (d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth()) {
+                    nMes++;
+                    if (d.getDate() === hoy.getDate()) nHoy++;
+                }
+            });
+
+            const lista = [];
+            currentData.forEach((row, idx) => {
+                if (q) {
+                    const texto = [row.INTERNO, row.PATENTE, row.CHOFER, row.INSPECTOR, row.interno, row.patente, row.chofer]
+                        .map(v => (v === null || v === undefined ? '' : v.toString().toUpperCase())).join(' | ');
+                    const esNumero = /^\d+$/.test(q);
+                    const okInterno = esNumero && normInterno(row.INTERNO || row.interno) === normInterno(q);
+                    if (!okInterno && !(!esNumero && texto.includes(q))) return;
+                }
+                if (fInsp && (row.INSPECTOR || row.inspector || '').toString().trim().toUpperCase() !== fInsp) return;
+                if (fRes === 'SUSP' && !esSuspension(row)) return;
+                if (fRes === 'APROB' && esSuspension(row)) return;
+                if (fPer) {
+                    const d = parseFechaHora(row.FECHA || row.timestamp);
+                    if (!d) return;
+                    const dia = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                    if (fPer === 'hoy' && dia.getTime() !== hoy.getTime()) return;
+                    if (fPer === '7' && dia < hace7) return;
+                    if (fPer === 'mes' && !(d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth())) return;
+                }
+                lista.push({ row, idx });
+            });
+
+            document.getElementById('hist-resumen').innerHTML =
+                `<span class="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200">Hoy: <b>${nHoy}</b></span>
+                 <span class="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200">Este mes: <b>${nMes}</b></span>
+                 <span class="px-2 py-1 rounded-md bg-gray-100 text-gray-600 border border-gray-200">Mostrando <b>${lista.length}</b> de ${currentData.length}</span>`;
+
+            tbody.innerHTML = '';
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">${currentData.length ? 'Ninguna inspección coincide con los filtros.' : 'No hay registros cargados.'}</td></tr>`;
+            }
+            lista.forEach(({ row, idx }) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer';
+                tr.onclick = () => verDetalle(idx);
+
+                const f = (row.FECHA || row.timestamp || '').toString().split('T')[0];
+                const emp = row.EMPRESA || row.empresa || '-';
+                const pat = row.PATENTE || row.patente || '-';
+                const inter = row.INTERNO || row.interno || '-';
+                const cho = row.CHOFER || row.chofer || '-';
+                const res = (row.RESULTADO || row.resultado_final || 'Aprobado').toString();
+
+                let badge = 'bg-green-50 text-green-700 border border-green-200';
+                if (res.toLowerCase().includes('susp')) badge = 'bg-red-50 text-red-700 border border-red-200';
+
+                tr.innerHTML = `
+                    <td class="p-3 font-medium text-gray-600">${escaparHtml(f)}</td>
+                    <td class="p-3 text-gray-700 font-bold uppercase">${escaparHtml(emp)}</td>
+                    <td class="p-3 text-gray-600 uppercase">${escaparHtml(pat)} <span class="text-gray-400">(${escaparHtml(inter)})</span></td>
+                    <td class="p-3 text-gray-500 uppercase">${escaparHtml(cho)}</td>
+                    <td class="p-3 text-center"><span class="px-2 py-0.5 rounded-md font-bold text-[10px] ${badge}">${escaparHtml(res.toUpperCase())}</span></td>
+                    <td class="p-3 text-center">
+                        <button onclick="event.stopPropagation(); eliminarRegistro(${row._fila})" class="text-red-500 hover:text-red-700">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+
+            renderFicha(q);
+        }
+
+        async function renderFicha(q) {
+            const cont = document.getElementById('hist-ficha');
+            if (!cont) return;
+            const token = ++fichaToken;
+            if (!q) { cont.classList.add('hidden'); cont.innerHTML = ''; return; }
+            await cargarMaestro();
+            if (token !== fichaToken) return;
+
+            // ¿Qué unidad es? Por interno exacto o por patente exacta
+            let interno = null;
+            let maestro = null;
+            if (/^\d+$/.test(q)) {
+                interno = normInterno(q);
+                maestro = filaMaestroPorInterno(interno);
+            } else {
+                const qp = q.replace(/\s/g, '');
+                maestro = (maestroCache || []).find(r => (r['PATENTE'] || '').toString().replace(/\s/g, '').toUpperCase() === qp) || null;
+                if (maestro) interno = normInterno(maestro['INTERNO']);
+                else {
+                    const h = currentData.find(r => (r.PATENTE || r.patente || '').toString().replace(/\s/g, '').toUpperCase() === qp);
+                    if (h) interno = normInterno(h.INTERNO || h.interno);
+                }
+            }
+            if (!interno) { cont.classList.add('hidden'); cont.innerHTML = ''; return; }
+
+            const previas = currentData.filter(r => normInterno(r.INTERNO || r.interno) === interno);
+            if (!maestro && previas.length === 0) { cont.classList.add('hidden'); cont.innerHTML = ''; return; }
+
+            const nSusp = previas.filter(esSuspension).length;
+            const pat = maestro ? maestro['PATENTE'] : (previas[0].PATENTE || previas[0].patente);
+            const veh = maestro ? `${maestro['VEHICULO'] || ''} ${maestro['MODELO'] || ''} ${(maestro['AÑO'] || '').toString().replace(/\.0$/, '')}`.trim()
+                                : `${previas[0].MARCA || ''} ${previas[0].MODELO || ''}`.trim();
+            const estado = maestro ? (maestro['ESTADO'] || '').toString().trim() : '';
+            const claseEstado = estaDadoDeBaja(estado) ? 'bg-gray-600 text-white' : estado.toUpperCase().includes('SUSPEND') ? 'bg-red-600 text-white' : 'bg-green-600 text-white';
+
+            let docs = '';
+            if (maestro) {
+                docs = DOCS_DASHBOARD.map(d => {
+                    const e = estadoDoc(maestro[d.key]);
+                    return `<div class="flex justify-between gap-2 py-1 border-b border-gray-100"><span class="text-gray-500 text-xs font-bold uppercase">${d.label}</span><span class="text-xs ${e.clase}">${escaparHtml(e.texto)}</span></div>`;
+                }).join('');
+            }
+            const obsMaestro = maestro && cargarValorTexto(maestro['OBSERVACIONES'])
+                ? `<p class="text-xs text-gray-600 mt-2"><b>Observaciones en planilla:</b> ${escaparHtml(maestro['OBSERVACIONES'])}</p>` : '';
+
+            const ultimas = previas.slice(0, 5).map(r => {
+                const fh = parseFechaHora(r.FECHA || r.timestamp);
+                const susp = esSuspension(r);
+                return `<li class="py-1 border-b border-gray-100 text-xs">
+                    <span class="font-bold text-gray-700">${fh ? fmtDMA(fh) : '-'}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${susp ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}">${escaparHtml((r.RESULTADO || r.resultado_final || '-').toString().toUpperCase())}</span>
+                    <span class="text-gray-500">· ${escaparHtml(r.INSPECTOR || r.inspector || '-')}</span>
+                    ${tieneObservacion(r) ? `<div class="text-gray-500 mt-0.5">${escaparHtml(r.OBSERVACIONES || r.observaciones)}</div>` : ''}
+                </li>`;
+            }).join('');
+
+            cont.innerHTML = `
+                <div class="flex items-start justify-between gap-2 flex-wrap">
+                    <div>
+                        <p class="text-base font-bold text-gray-800">Interno ${escaparHtml(interno)} <span class="text-gray-500 font-medium text-sm">· ${escaparHtml(pat)}</span></p>
+                        <p class="text-xs text-gray-500">${escaparHtml(veh) || '-'}</p>
+                    </div>
+                    ${estado ? `<span class="text-[10px] font-bold px-2 py-1 rounded-full ${claseEstado}">${escaparHtml(estado.toUpperCase())}</span>` : ''}
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center my-3">
+                    <div class="bg-white border border-gray-200 rounded-lg p-2"><p class="text-lg font-bold text-gray-800">${previas.length}</p><p class="text-[10px] uppercase text-gray-400 font-bold">Inspecciones</p></div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-2"><p class="text-lg font-bold ${nSusp ? 'text-red-600' : 'text-gray-800'}">${nSusp}</p><p class="text-[10px] uppercase text-gray-400 font-bold">Suspensiones</p></div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-2"><p class="text-lg font-bold text-gray-800">${previas.length ? (parseFechaHora(previas[0].FECHA || previas[0].timestamp) ? fmtDMA(parseFechaHora(previas[0].FECHA || previas[0].timestamp)) : '-') : '-'}</p><p class="text-[10px] uppercase text-gray-400 font-bold">Última</p></div>
+                </div>
+                ${docs ? `<div class="mb-2">${docs}</div>` : ''}
+                ${obsMaestro}
+                ${ultimas ? `<p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mt-3 mb-1">Últimas inspecciones</p><ul>${ultimas}</ul>` : ''}`;
+            cont.classList.remove('hidden');
+        }
+
+        // ---------- 6) META DE DICIEMBRE ----------
+        function diasHabiles(desde, hasta) {
+            let n = 0;
+            const d = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+            while (d <= hasta) {
+                const dow = d.getDay();
+                if (dow !== 0 && dow !== 6) n++;
+                d.setDate(d.getDate() + 1);
+            }
+            return n;
+        }
+        function sumarDiasHabiles(desde, cantidad) {
+            const d = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+            let restan = cantidad;
+            while (restan > 0) {
+                const dow = d.getDay();
+                if (dow !== 0 && dow !== 6) restan--;
+                if (restan > 0) d.setDate(d.getDate() + 1);
+            }
+            return d;
+        }
+        function renderMeta(stats) {
+            const cont = document.getElementById('dash-meta');
+            if (!cont) return;
+            const total = stats.flotaActiva;
+            const hechas = stats.inspeccionadas;
+            const pend = Math.max(0, total - hechas);
+            const pct = total ? Math.round((hechas / total) * 100) : 0;
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const dias = hoy <= META_FECHA ? diasHabiles(hoy, META_FECHA) : 0;
+            const capacidad = dias * CAPACIDAD_DIARIA;
+            const necesarias = dias ? (pend / dias) : Infinity;
+            let estadoHtml, detalle;
+            if (pend === 0) {
+                estadoHtml = '<span class="px-2 py-1 rounded-md bg-green-900/60 text-green-300 border border-green-700 font-bold text-xs">✅ Meta cumplida</span>';
+                detalle = 'Todas las unidades activas ya tienen su inspección.';
+            } else if (dias === 0) {
+                estadoHtml = '<span class="px-2 py-1 rounded-md bg-red-900/60 text-red-300 border border-red-700 font-bold text-xs">🔴 Plazo vencido</span>';
+                detalle = `Quedan ${pend} unidades sin inspeccionar y la fecha límite ya pasó.`;
+            } else if (capacidad >= pend) {
+                const fin = sumarDiasHabiles(hoy, Math.ceil(pend / CAPACIDAD_DIARIA));
+                estadoHtml = '<span class="px-2 py-1 rounded-md bg-green-900/60 text-green-300 border border-green-700 font-bold text-xs">🟢 En ritmo</span>';
+                detalle = `Al ritmo de ${CAPACIDAD_DIARIA} por día se termina alrededor del ${fmtDMA(fin)}. Necesitás ${necesarias.toFixed(1)} por día hábil.`;
+            } else {
+                const extra = Math.ceil(pend / CAPACIDAD_DIARIA) - dias;
+                estadoHtml = '<span class="px-2 py-1 rounded-md bg-red-900/60 text-red-300 border border-red-700 font-bold text-xs">🔴 Atrasado</span>';
+                detalle = `A ${CAPACIDAD_DIARIA} por día no alcanza: faltarían ${extra} día${extra === 1 ? '' : 's'} hábiles. Necesitás ${necesarias.toFixed(1)} por día hábil.`;
+            }
+            cont.innerHTML = `
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Meta: terminar antes de diciembre <span class="text-gray-500 font-normal normal-case">· límite ${fmtDMA(META_FECHA)}</span></p>
+                    ${estadoHtml}
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden"><div class="bg-blue-500 h-3 rounded-full" style="width:${pct}%"></div></div>
+                <div class="grid grid-cols-3 gap-2 text-center mt-3">
+                    <div><p class="text-lg font-bold text-white">${hechas}<span class="text-gray-500 text-xs font-normal"> / ${total}</span></p><p class="text-[10px] uppercase text-gray-400 font-bold">Inspeccionadas (${pct}%)</p></div>
+                    <div><p class="text-lg font-bold text-white">${pend}</p><p class="text-[10px] uppercase text-gray-400 font-bold">Pendientes</p></div>
+                    <div><p class="text-lg font-bold text-white">${dias}</p><p class="text-[10px] uppercase text-gray-400 font-bold">Días hábiles</p></div>
+                </div>
+                <p class="text-xs text-gray-300 mt-3">${detalle}</p>
+                <p class="text-[10px] text-gray-500 mt-1">No descuenta feriados. "Inspeccionadas" usa el mismo criterio del panel (unidades con turno cargado en MAESTRO).</p>`;
+        }
+
+        // ---------- 5) REINCIDENTES ----------
+        function renderReincidentes(historial) {
+            const cont = document.getElementById('dash-reincidentes');
+            const resumen = document.getElementById('dash-reincidentes-resumen');
+            if (!cont || !resumen) return;
+            const grupos = {};
+            historial.forEach(r => {
+                const n = normInterno(r.INTERNO || r.interno);
+                if (!n) return;
+                if (!grupos[n]) grupos[n] = { n, patente: r.PATENTE || r.patente || '', insp: 0, susp: 0, obs: 0, problemas: 0, ultimaObs: '' };
+                const g = grupos[n];
+                g.insp++;
+                const s = esSuspension(r), o = tieneObservacion(r);
+                if (s) g.susp++;
+                if (o) { g.obs++; if (!g.ultimaObs) g.ultimaObs = (r.OBSERVACIONES || r.observaciones).toString(); }
+                if (s || o) g.problemas++;
+            });
+            const lista = Object.values(grupos).filter(g => g.problemas >= 2)
+                .sort((a, b) => b.problemas - a.problemas || b.susp - a.susp);
+            resumen.innerHTML = `<span class="px-2 py-1 rounded-md bg-orange-900/50 text-orange-300 border border-orange-700">🔁 ${lista.length} unidad${lista.length === 1 ? '' : 'es'}</span>`;
+            if (lista.length === 0) {
+                cont.innerHTML = '<p class="text-xs text-gray-500 py-3">No hay unidades con 2 o más inspecciones con problemas.</p>';
+                return;
+            }
+            cont.innerHTML = lista.slice(0, 30).map(g => `
+                <div class="rounded-lg border border-orange-700 bg-orange-950/40 p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="font-bold text-gray-100 text-sm">Int. ${escaparHtml(g.n)} <span class="text-gray-400 font-normal text-xs">${escaparHtml(g.patente)}</span></p>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white">${g.problemas} problemas</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">${g.insp} inspecciones · ${g.susp} ${g.susp === 1 ? 'suspensión' : 'suspensiones'} · ${g.obs} con observaciones</p>
+                    ${g.ultimaObs ? `<p class="text-xs text-gray-300 mt-1 leading-snug">Última: ${escaparHtml(g.ultimaObs)}</p>` : ''}
+                </div>`).join('');
+        }
+
+        // ---------- 8) WHATSAPP DE VENCIMIENTOS ----------
+        function configurarModal(modo) {
+            modalModo = modo;
+            const t = document.getElementById('shareTitulo');
+            const s = document.getElementById('shareSub');
+            if (modo === 'vencimientos') {
+                t.textContent = 'Vencimientos de la flota';
+                s.textContent = 'Listado listo para enviar por WhatsApp.';
+                document.getElementById('shareFotosInfo').classList.add('hidden');
+            } else {
+                t.textContent = '¡Registro Guardado con Éxito!';
+                s.textContent = 'Los datos se subieron a Google Sheets.';
+            }
+        }
+
+        async function prepararWhatsAppVencimientos() {
+            showToast('Armando el listado...');
+            const maestro = await cargarMaestro(true);
+            if (!maestro.length) { showToast('❌ No se pudo leer la hoja MAESTRO'); return; }
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const porUnidad = {};
+            maestro.forEach(r => {
+                if (estaDadoDeBaja(r['ESTADO'])) return;
+                DOCS_DASHBOARD.forEach(d => {
+                    const f = parseFechaFlexible(r[d.key]);
+                    if (!f) return;
+                    const dias = Math.round((f - hoy) / 86400000);
+                    if (dias > 30) return;
+                    const k = normInterno(r['INTERNO']);
+                    if (!porUnidad[k]) porUnidad[k] = { interno: k, patente: r['PATENTE'] || '', docs: [], minDias: dias };
+                    porUnidad[k].docs.push({ label: d.label, f, dias });
+                    porUnidad[k].minDias = Math.min(porUnidad[k].minDias, dias);
+                });
+            });
+            const unidades = Object.values(porUnidad);
+            const vencidas = unidades.filter(u => u.minDias < 0).sort((a, b) => a.minDias - b.minDias);
+            const porVencer = unidades.filter(u => u.minDias >= 0).sort((a, b) => a.minDias - b.minDias);
+            const linea = (u) => `- Int. ${u.interno} (${String(u.patente).toUpperCase()}): ` + u.docs
+                .sort((a, b) => a.dias - b.dias)
+                .map(d => `${d.label} ${fmtDMA(d.f)}${d.dias < 0 ? ` (hace ${-d.dias} d)` : d.dias === 0 ? ' (HOY)' : ` (en ${d.dias} d)`}`).join(', ');
+            const LIMITE = 40;
+            const bloque = (arr) => arr.slice(0, LIMITE).map(linea).join('\n') + (arr.length > LIMITE ? `\n... y ${arr.length - LIMITE} más` : '');
+
+            let txt = `*CANNING STAR - VENCIMIENTOS DE DOCUMENTACIÓN*\n📅 ${fmtDMA(new Date())}\n\n`;
+            txt += `*🔴 VENCIDOS (${vencidas.length} unidades)*\n${vencidas.length ? bloque(vencidas) : 'Ninguno'}\n\n`;
+            txt += `*🟠 VENCEN EN 30 DÍAS O MENOS (${porVencer.length} unidades)*\n${porVencer.length ? bloque(porVencer) : 'Ninguno'}`;
+            compiledWhatsAppText = txt.trim();
+
+            document.getElementById('shareTextPreview').value = compiledWhatsAppText;
+            configurarModal('vencimientos');
+            const modal = document.getElementById('shareModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // ---------- 7) BORRADOR AUTOMÁTICO ----------
+        const CLAVE_BORRADOR = 'borradorInspeccion';
+        let borradorTimer = null;
+        function guardarBorrador() {
+            try {
+                const form = document.getElementById('inspectionForm');
+                const datos = {};
+                new FormData(form).forEach((v, k) => { if (k !== 'fecha' && k !== 'empresa') datos[k] = v; });
+                const hayTexto = ['interno', 'patente', 'marca', 'modelo', 'chofer', 'inspector', 'observaciones']
+                    .some(k => (datos[k] || '').toString().trim() !== '');
+                if (!hayTexto) { localStorage.removeItem(CLAVE_BORRADOR); return; }
+                localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({ t: Date.now(), datos }));
+            } catch (e) {}
+        }
+        function programarBorrador() {
+            clearTimeout(borradorTimer);
+            borradorTimer = setTimeout(guardarBorrador, 600);
+        }
+        function borrarBorrador() {
+            clearTimeout(borradorTimer);
+            try { localStorage.removeItem(CLAVE_BORRADOR); } catch (e) {}
+        }
+        function restaurarBorrador() {
+            try {
+                const raw = localStorage.getItem(CLAVE_BORRADOR);
+                if (!raw) return;
+                const b = JSON.parse(raw);
+                if (!b || !b.datos || (Date.now() - b.t) > 24 * 3600 * 1000) { localStorage.removeItem(CLAVE_BORRADOR); return; }
+                Object.keys(b.datos).forEach(k => {
+                    const els = document.querySelectorAll(`#inspectionForm [name="${k}"]`);
+                    if (!els.length) return;
+                    if (els[0].type === 'radio') {
+                        els.forEach(e => { e.checked = (e.value === b.datos[k]); });
+                    } else {
+                        els[0].value = b.datos[k];
+                    }
+                });
+                showToast('📝 Se recuperó la inspección que estabas cargando');
+                if (normInterno((campoForm('interno') || {}).value)) autocompletarPorInterno();
+            } catch (e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Si la persona edita a mano un campo autocompletado, se respeta lo que escribió
+            CAMPOS_AUTO.forEach(n => {
+                const el = campoForm(n);
+                if (el) el.addEventListener('input', () => { el.dataset.auto = '0'; });
+            });
+            const form = document.getElementById('inspectionForm');
+            form.addEventListener('input', programarBorrador);
+            form.addEventListener('change', programarBorrador);
+            ['hist-buscar', 'hist-inspector', 'hist-resultado', 'hist-periodo'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener(id === 'hist-buscar' ? 'input' : 'change', renderHistorial);
+            });
+            restaurarBorrador();
+        });
+
 
         let maestroCache = null; // Copia de la hoja MAESTRO para completar vencimientos en el WhatsApp
         let currentData = []; // Guarda en memoria los registros ya cargados del Historial
@@ -588,6 +1156,9 @@
             const form = document.getElementById('inspectionForm');
             form.reset();
             limpiarFotos();
+            borrarBorrador();
+            limpiarAuto();
+            const hintI = document.getElementById('interno-hint'); if (hintI) hintI.classList.add('hidden');
             document.getElementById('campo-fecha').value = new Date().toISOString().split('T')[0];
             showToast("⚠️ Formulario restablecido por completo");
         }
@@ -601,46 +1172,15 @@
                 const response = await fetch(GOOGLE_SCRIPT_URL);
                 const data = await response.json();
                 
-                // Ordena descendente por marca temporal
-                data.sort((a, b) => new Date(b.FECHA || b.timestamp) - new Date(a.FECHA || a.timestamp));
+                // Orden: lo más nuevo primero (si no se puede leer la fecha, queda el orden que manda la planilla)
+                data.sort((x, y) => {
+                    const dx = parseFechaHora(x.FECHA || x.timestamp), dy = parseFechaHora(y.FECHA || y.timestamp);
+                    return (dx && dy) ? (dy - dx) : 0;
+                });
 
                 currentData = data; // Guardamos los registros para poder mostrarlos en el detalle
-
-                tbody.innerHTML = "";
-                if(data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">No hay registros cargados.</td></tr>`;
-                    return;
-                }
-
-                data.forEach((row, idx) => {
-                    const tr = document.createElement('tr');
-                    tr.className = "border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer";
-                    tr.onclick = () => verDetalle(idx);
-                    
-                    const f = (row.FECHA || row.timestamp || '').split('T')[0];
-                    const emp = row.EMPRESA || row.empresa || '-';
-                    const pat = row.PATENTE || row.patente || '-';
-                    const inter = row.INTERNO || row.interno || '-';
-                    const cho = row.CHOFER || row.chofer || '-';
-                    const res = row.RESULTADO || row.resultado_final || 'Aprobado';
-
-                    let badge = "bg-green-50 text-green-700 border border-green-200";
-                    if(res.toLowerCase().includes('susp')) badge = "bg-red-50 text-red-700 border border-red-200";
-
-                    tr.innerHTML = `
-                        <td class="p-3 font-medium text-gray-600">${f}</td>
-                        <td class="p-3 text-gray-700 font-bold uppercase">${emp}</td>
-                        <td class="p-3 text-gray-600 uppercase">${pat} <span class="text-gray-400">(${inter})</span></td>
-                        <td class="p-3 text-gray-500 uppercase">${cho}</td>
-                        <td class="p-3 text-center"><span class="px-2 py-0.5 rounded-md font-bold text-[10px] ${badge}">${res.toUpperCase()}</span></td>
-                        <td class="p-3 text-center">
-                            <button onclick="event.stopPropagation(); eliminarRegistro(${row._fila})" class="text-red-500 hover:text-red-700">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                poblarFiltroInspectores();
+                renderHistorial();
                 if(status) status.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Conectado a Sheets`;
             } catch (err) {
                 console.error("Error cargando historial:", err);
@@ -736,6 +1276,7 @@
 
                 // Abrir modal de compartir
                 document.getElementById('shareTextPreview').value = compiledWhatsAppText;
+                configurarModal('inspeccion');
                 const infoFotos = document.getElementById('shareFotosInfo');
                 if (fotosInspeccion.length > 0) {
                     infoFotos.textContent = `📷 ${fotosInspeccion.length} foto${fotosInspeccion.length === 1 ? '' : 's'} se adjuntará${fotosInspeccion.length === 1 ? '' : 'n'} al mensaje`;
@@ -748,6 +1289,9 @@
                 modal.classList.add('flex');
                 
                 form.reset();
+                borrarBorrador();
+                limpiarAuto();
+                const hintI = document.getElementById('interno-hint'); if (hintI) hintI.classList.add('hidden');
                 document.getElementById('campo-fecha').value = new Date().toISOString().split('T')[0];
                 fetchSheetsData();
             } catch (error) {
@@ -901,7 +1445,7 @@
         // Acciones del cuadro de compartir
         async function shareViaWhatsApp() {
             // Con fotos: se usa el menú "Compartir" del celular (es la única forma de adjuntar imágenes desde una web)
-            if (fotosInspeccion.length > 0) {
+            if (modalModo === 'inspeccion' && fotosInspeccion.length > 0) {
                 try {
                     const archivos = fotosInspeccion.map(f => f.file);
                     if (navigator.canShare && navigator.canShare({ files: archivos })) {
@@ -999,7 +1543,7 @@
         }
 
         function closeShareModal() {
-            limpiarFotos();
+            if (modalModo === 'inspeccion') limpiarFotos();
             document.getElementById('shareModal').classList.replace('flex', 'hidden');
         }
 
@@ -1070,6 +1614,8 @@
                 maestroCache = data;
                 try { renderCriticos(data); } catch (e) { console.warn('No se pudo armar el listado de críticos', e); }
                 const stats = computeDashboardStats(data);
+                try { renderMeta(stats); } catch (e) { console.warn('No se pudo armar la meta', e); }
+                cargarHistorial(true).then(h => { try { renderReincidentes(h); } catch (e) { console.warn('Reincidentes', e); } });
                 renderDashboard(stats);
 
                 const ahora = new Date();
