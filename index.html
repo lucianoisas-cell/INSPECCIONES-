@@ -1792,10 +1792,21 @@
         }
 
         function renderDashboard(stats) {
-            renderKpis(stats);
-            renderChart(stats);
-            renderCoverage(stats);
-            renderUrgencia(stats);
+            // Cada panel se arma por separado: si uno falla (por ejemplo el gráfico), los demás se siguen viendo
+            const paneles = [
+                ['Indicadores', renderKpis, 'dash-kpis'],
+                ['Gráfico', renderChart, null],
+                ['Cobertura', renderCoverage, 'dash-coverage'],
+                ['Cola de urgencia', renderUrgencia, 'dash-urgencia']
+            ];
+            paneles.forEach(([nombre, fn, idCont]) => {
+                try { fn(stats); }
+                catch (e) {
+                    console.error('Error en el panel ' + nombre, e);
+                    const cont = idCont ? document.getElementById(idCont) : null;
+                    if (cont) cont.innerHTML = `<p class="text-xs text-red-400 py-3">No se pudo mostrar este panel (${escaparHtml(e && e.message)}).</p>`;
+                }
+            });
         }
 
         function kpiCard(valor, label, sublabel, colorClass) {
